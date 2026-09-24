@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>sp_antilag audio</title></head>
+<body>
+<script>
+// Synthesised exhaust pops / bangs. Nothing is prerecorded: every shot is built from
+// noise + a sub "thump" with slight randomisation so no two hits sound identical.
+let ctx = null, master = null, noise = null, shaper = null;
+
+function init() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+    master = ctx.createDynamicsCompressor();
+    master.threshold.value = -10; master.knee.value = 6; master.ratio.value = 8;
+    master.attack.value = 0.001; master.release.value = 0.12;
+    master.connect(ctx.destination);
+
+    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = noise.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+    const n = 1024, curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curve[i] = Math.tanh(x * 4); }
+    shaper = curve;
+}
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+const KINDS = {
+    //        body length, noise filter,         sub start/end Hz, sub len, level, drive
+    pop:  { dur: 0.07, type: 'bandpass', f: [900, 1900],  q: 0.9, sub: [140, 60],  subDur: 0.06, gain: 0.55, crack: 0.35 },
+    bang: { dur: 0.24, type: 'lowpass',  f: [1800, 2600], q: 0.7, sub: [95, 38],   subDur: 0.20, gain: 0.95, crack: 0.7 },
+    mega: { dur: 0.42, type: 'lowpass',  f: [2200, 3200], q: 0.6, sub: [80, 30],   subDur: 0.34, gain: 1.15, crack: 1.0 },
+};
+
+function envGain(t, peak, dur) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    return g;
+}
+
+function shot(kind, volume, muffle, at) {
+    const k = KINDS[kind] || KINDS.pop;
+    const t = at || ctx.currentTime + 0.005;
+    const scale = rnd(0.85, 1.15);
+    const dur = k.dur * scale;
+
+    // Distance muffling: further away = duller.
+    const out = ctx.createBiquadFilter();
+    out.type = 'lowpass';
+    out.frequency.value = 600 + 17000 * Math.pow(1 - Math.min(Math.max(muffle, 0), 1), 2);
+    const vol = ctx.createGain();
+    vol.gain.value = volume;
+    out.connect(vol); vol.connect(master);
+
+    // Body: filtered noise through a soft clipper.
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    const filt = ctx.createBiquadFilter();
+    filt.type = k.type; filt.frequency.value = rnd(k.f[0], k.f[1]); filt.Q.value = k.q;
+    const drive = ctx.createWaveShaper(); drive.curve = shaper;
+    const body = envGain(t, k.gain, dur);
+    src.connect(filt); filt.connect(drive); drive.connect(body); body.connect(out);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+
+    // Crack: very short bright transient at the front of the shot.
+    const c = ctx.createBufferSource();
+    c.buffer = noise;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500;
+    const cg = envGain(t, k.crack, 0.012);
+    c.connect(hp); hp.connect(cg); cg.connect(out);
+    c.start(t, Math.random() * 0.5); c.stop(t + 0.03);
+
+    // Thump: pitch-dropping sine for the low end.
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(k.sub[0] * scale, t);
+    o.frequency.exponentialRampToValueAtTime(k.sub[1], t + k.subDur);
+    const og = envGain(t, k.gain * 0.9, k.subDur * scale);
+    o.connect(og); og.connect(out);
+    o.start(t); o.stop(t + k.subDur * scale + 0.02);
+
+    // Mega gets a second, slightly delayed report.
+    if (kind === 'mega' && !at) shot('bang', volume * 0.7, muffle, t + rnd(0.03, 0.06));
+}
+
+window.addEventListener('message', (e) => {
+    const m = e.data;
+    if (!m || m.action !== 'sp_antilag') return;
+    init();
+    if (ctx.state === 'suspended') ctx.resume();
+    shot(m.kind, Math.max(0, Math.min(m.volume || 0, 1.5)), m.muffle || 0);
+});
+</script>
+</body>
+</html>

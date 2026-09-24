@@ -150,12 +150,33 @@ local function loadPtfx()
     return HasNamedPtfxAssetLoaded('core')
 end
 
+local loadedBanks={}
 local function nativeSound(vehicle,kind)
     local s=Config.NativeSounds[kind] or Config.NativeSounds.pop
-    -- The sound belongs to the vehicle entity rather than the NUI/browser.
+    if s.bank and not loadedBanks[s.bank] then
+        loadedBanks[s.bank]=RequestScriptAudioBank(s.bank,false)
+    end
     -- Not networked: other clients already play it themselves from the synced
     -- sp_antilag:effect event, so a networked sound would double up.
     PlaySoundFromEntity(-1,s.name,vehicle,s.set,false,0)
+end
+
+-- V4.4.2: synthesised pops/bangs through NUI (html/index.html), volume and
+-- muffling by distance from the camera.
+local function synthSound(vehicle,kind)
+    local dist=#(GetFinalRenderedCamCoord()-GetEntityCoords(vehicle))
+    if dist>Config.SoundRange then return end
+    local f=dist/Config.SoundRange
+    SendNUIMessage({
+        action='sp_antilag',
+        kind=kind,
+        volume=Config.SoundVolume*(1.0-f)^2,
+        muffle=f
+    })
+end
+
+local function playSound(vehicle,kind)
+    if Config.SoundMode=='native' then nativeSound(vehicle,kind) else synthSound(vehicle,kind) end
 end
 
 local function spawnFlame(p,heading,scale,r,g,b)
@@ -215,14 +236,14 @@ RegisterNetEvent('sp_antilag:effect',function(netId,kind,sourceServerId,colour,w
     local vehicle=NetToVeh(netId)
     if vehicle==0 or not DoesEntityExist(vehicle) then return end
     if #(GetEntityCoords(PlayerPedId())-GetEntityCoords(vehicle))>Config.Range then return end
-    nativeSound(vehicle,kind)
+    playSound(vehicle,kind)
     if withFlame~=false then flame(vehicle,kind~='pop',colour) end
 end)
 
 local function send(vehicle,kind,withFlame)
     if withFlame==nil then withFlame=true end
     local settings=settingsOf(vehicle)
-    nativeSound(vehicle,kind)
+    playSound(vehicle,kind)
     if withFlame then flame(vehicle,kind~='pop',settings and settings.colour) end
     TriggerServerEvent('sp_antilag:effect',VehToNet(vehicle),plateOf(vehicle),kind,withFlame)
 end
@@ -407,3 +428,19 @@ openMenu=function()
 end
 
 RegisterCommand(Config.MenuCommand,function() openMenu() end,false)
+
+-- /antilagtest: plays pop, pop, bang, pop, mega locally so you can check the sound works.
+RegisterCommand('antilagtest',function()
+    local ped=PlayerPedId()
+    local vehicle=GetVehiclePedIsIn(ped,false)
+    local target=vehicle~=0 and vehicle or ped
+    CreateThread(function()
+        for _,kind in ipairs({'pop','pop','bang','pop','mega'}) do
+            playSound(target,kind)
+            if vehicle~=0 then flame(vehicle,kind~='pop',(settingsOf(vehicle) or {}).colour) end
+            Wait(kind=='pop' and 110 or 450)
+        end
+    end)
+end,false)
+
+print(('^2[sp_antilag] client v%s loaded (sound mode: %s)^7'):format(GetResourceMetadata(GetCurrentResourceName(),'version',0) or '?',Config.SoundMode))

@@ -176,3 +176,5 @@ RegisterNetEvent('sp_antilag:effect', function(netId, clientPlate, kind, withFla
 end)
 
 AddEventHandler('playerDropped',function() rate[source]=nil end)
+
+print(('^2[sp_antilag] v%s loaded from %s^7'):format(GetResourceMetadata(GetCurrentResourceName(),'version',0) or '?',GetResourcePath(GetCurrentResourceName())))
