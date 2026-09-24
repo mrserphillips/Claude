@@ -1,3 +1,4 @@
+-- installed[plate] = { colour = 'stock' | preset key | '#RRGGBB', pops = true/false }
 local installed = {}
 
 local function cleanPlate(p)
@@ -10,16 +11,52 @@ local function isMechanic(src)
     return job and Config.MechanicJobs[job.name] == true
 end
 
+local presetKeys = {}
+for _, c in ipairs(Config.FlameColours) do presetKeys[c.key] = true end
+
+local function validColour(colour)
+    if type(colour) ~= 'string' then return nil end
+    if presetKeys[colour] then return colour end
+    if Config.AllowCustomColour and colour:match('^#%x%x%x%x%x%x$') then return colour:upper() end
+    return nil
+end
+
+local function defaultSettings()
+    return {
+        colour = validColour(Config.DefaultFlameColour) or 'stock',
+        pops = Config.PopsBangs.DefaultOn == true
+    }
+end
+
+local function columnExists(column)
+    local rows = MySQL.query.await([[SELECT 1 FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sp_antilag' AND COLUMN_NAME = ?]], { column })
+    return rows and #rows > 0
+end
+
 CreateThread(function()
     MySQL.query.await([[CREATE TABLE IF NOT EXISTS sp_antilag (
         plate VARCHAR(16) NOT NULL PRIMARY KEY
     )]])
-    local rows=MySQL.query.await('SELECT plate FROM sp_antilag') or {}
-    for _,row in ipairs(rows) do installed[cleanPlate(row.plate)] = true end
+    -- V4.4: upgrade older plate-only tables in place.
+    if not columnExists('flame_colour') then
+        MySQL.query.await("ALTER TABLE sp_antilag ADD COLUMN flame_colour VARCHAR(16) NOT NULL DEFAULT 'stock'")
+    end
+    if not columnExists('pops_bangs') then
+        MySQL.query.await('ALTER TABLE sp_antilag ADD COLUMN pops_bangs TINYINT(1) NOT NULL DEFAULT 1')
+    end
+
+    local rows = MySQL.query.await('SELECT plate, flame_colour, pops_bangs FROM sp_antilag') or {}
+    for _, row in ipairs(rows) do
+        installed[cleanPlate(row.plate)] = {
+            colour = validColour(row.flame_colour) or 'stock',
+            pops = row.pops_bangs == 1 or row.pops_bangs == true
+        }
+    end
 end)
 
 lib.callback.register('sp_antilag:isInstalled', function(_, plate)
-    return installed[cleanPlate(plate)] == true
+    return installed[cleanPlate(plate)] or false
 end)
 
 RegisterNetEvent('sp_antilag:requestInstall', function(plate)
@@ -48,9 +85,11 @@ RegisterNetEvent('sp_antilag:finishInstall', function(netId, expectedPlate)
     if installed[plate] then return end
     if (exports.ox_inventory:Search(src,'count',Config.KitItem) or 0) < 1 then return end
     if not exports.ox_inventory:RemoveItem(src,Config.KitItem,1) then return end
-    MySQL.query.await('INSERT IGNORE INTO sp_antilag (plate) VALUES (?)',{plate})
-    installed[plate]=true
-    TriggerClientEvent('sp_antilag:setInstalled',-1,plate,true)
+    local settings=defaultSettings()
+    MySQL.query.await('INSERT IGNORE INTO sp_antilag (plate, flame_colour, pops_bangs) VALUES (?, ?, ?)',
+        {plate, settings.colour, settings.pops and 1 or 0})
+    installed[plate]=settings
+    TriggerClientEvent('sp_antilag:setInstalled',-1,plate,settings)
     TriggerClientEvent('ox_lib:notify',src,{type='success',description='Anti-lag fitted successfully.'})
 end)
 
@@ -83,20 +122,57 @@ RegisterNetEvent('sp_antilag:remove', function(netId, expectedPlate)
     TriggerClientEvent('ox_lib:notify',src,{type='success',description='Anti-lag removed successfully.'})
 end)
 
+-- V4.4: flame colour / pops & bangs settings. Sender must be in the driver seat of the fitted vehicle.
+RegisterNetEvent('sp_antilag:updateSettings', function(netId, expectedPlate, colour, pops)
+    local src=source
+    if Config.SettingsPermission=='mechanic' and not isMechanic(src) then
+        return TriggerClientEvent('ox_lib:notify',src,{type='error',description='Only a mechanic can tune the anti-lag.'})
+    end
+
+    local entity=NetworkGetEntityFromNetworkId(netId)
+    if entity==0 or not DoesEntityExist(entity) then return end
+    if GetPedInVehicleSeat(entity,-1)~=GetPlayerPed(src) then
+        return TriggerClientEvent('ox_lib:notify',src,{type='error',description='You must be in the driver seat.'})
+    end
+
+    local plate=cleanPlate(GetVehicleNumberPlateText(entity))
+    if plate=='' or plate~=cleanPlate(expectedPlate) then return end
+    local current=installed[plate]
+    if not current then return end
+
+    local newColour=current.colour
+    if colour~=nil then
+        newColour=validColour(colour)
+        if not newColour then
+            return TriggerClientEvent('ox_lib:notify',src,{type='error',description='Invalid flame colour.'})
+        end
+    end
+    local newPops=current.pops
+    if pops~=nil then newPops=pops==true end
+
+    MySQL.update.await('UPDATE sp_antilag SET flame_colour = ?, pops_bangs = ? WHERE plate = ?',
+        {newColour, newPops and 1 or 0, plate})
+    current.colour=newColour
+    current.pops=newPops
+    TriggerClientEvent('sp_antilag:setInstalled',-1,plate,current)
+    TriggerClientEvent('ox_lib:notify',src,{type='success',description='Anti-lag settings saved.'})
+end)
+
 local rate={}
-RegisterNetEvent('sp_antilag:effect', function(netId, clientPlate, kind)
+RegisterNetEvent('sp_antilag:effect', function(netId, clientPlate, kind, withFlame)
     local src=source
     if kind~='pop' and kind~='bang' and kind~='mega' then return end
     local now=os.clock()
     if rate[src] and now-rate[src] < 0.07 then return end
     rate[src]=now
     local plate=cleanPlate(clientPlate)
-    if plate=='' or not installed[plate] then return end
+    local settings=plate~='' and installed[plate]
+    if not settings then return end
     local entity=NetworkGetEntityFromNetworkId(netId)
     if entity==0 or not DoesEntityExist(entity) then return end
     local serverPlate=cleanPlate(GetVehicleNumberPlateText(entity))
     if serverPlate~=plate then return end
-    TriggerClientEvent('sp_antilag:effect',-1,netId,kind,src)
+    TriggerClientEvent('sp_antilag:effect',-1,netId,kind,src,settings.colour,withFlame~=false)
 end)
 
 AddEventHandler('playerDropped',function() rate[source]=nil end)

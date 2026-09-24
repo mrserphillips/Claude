@@ -27,13 +27,18 @@ local function currentInstallVehicle()
     return vehicle
 end
 
-local function installed(vehicle)
+-- installedCache[plate] = false, or { colour = ..., pops = true/false }
+local function settingsOf(vehicle)
     local plate = plateOf(vehicle)
     if plate == '' then return false end
     if installedCache[plate] ~= nil then return installedCache[plate] end
     local result = lib.callback.await('sp_antilag:isInstalled', false, plate)
-    installedCache[plate] = result == true
+    installedCache[plate] = type(result) == 'table' and result or false
     return installedCache[plate]
+end
+
+local function installed(vehicle)
+    return settingsOf(vehicle) ~= false
 end
 
 exports('useAntiLagKit', function()
@@ -81,7 +86,7 @@ RegisterCommand('removeantilag', function()
     end
 
     local ok = lib.progressBar({
-        duration=10000,
+        duration=Config.RemoveTime,
         label='Removing anti-lag system...',
         canCancel=true,
         disable={car=true, move=true,combat=true}
@@ -92,11 +97,50 @@ RegisterCommand('removeantilag', function()
     end
 end, false)
 
-RegisterNetEvent('sp_antilag:setInstalled', function(plate, state)
-    installedCache[cleanPlate(plate)] = state == true
+RegisterNetEvent('sp_antilag:setInstalled', function(plate, settings)
+    installedCache[cleanPlate(plate)] = type(settings) == 'table' and settings or false
 end)
 
 local exhaustNames={'exhaust','exhaust_2','exhaust_3','exhaust_4','exhaust_5','exhaust_6','exhaust_7','exhaust_8','exhaust_9','exhaust_10','exhaust_11','exhaust_12','exhaust_13','exhaust_14','exhaust_15','exhaust_16'}
+
+local presetByKey={}
+for _,c in ipairs(Config.FlameColours) do presetByKey[c.key]=c end
+
+local function hsvToRgb(h)
+    -- Full saturation / value; h in 0..1. Returns 0..1 floats.
+    local i=math.floor(h*6)
+    local f=h*6-i
+    local q,t=1-f,f
+    i=i%6
+    if i==0 then return 1,t,0
+    elseif i==1 then return q,1,0
+    elseif i==2 then return 0,1,t
+    elseif i==3 then return 0,q,1
+    elseif i==4 then return t,0,1
+    end
+    return 1,0,q
+end
+
+-- Returns r,g,b (0..1) for the tint, or nil for the untouched stock flame.
+local function resolveColour(colour)
+    if type(colour)~='string' then return nil end
+    local preset=presetByKey[colour]
+    if preset then
+        if preset.rgb==nil then return nil end
+        if preset.rgb=='rainbow' then return hsvToRgb((GetGameTimer()%2400)/2400) end
+        return preset.rgb[1]/255,preset.rgb[2]/255,preset.rgb[3]/255
+    end
+    if colour:match('^#%x%x%x%x%x%x$') then
+        return tonumber(colour:sub(2,3),16)/255,tonumber(colour:sub(4,5),16)/255,tonumber(colour:sub(6,7),16)/255
+    end
+    return nil
+end
+
+local function colourLabel(colour)
+    local preset=presetByKey[colour]
+    if preset then return preset.label end
+    return colour or 'Stock'
+end
 
 local function loadPtfx()
     if HasNamedPtfxAssetLoaded('core') then return true end
@@ -112,36 +156,32 @@ local function nativeSound(vehicle,kind)
     PlaySoundFromEntity(-1,s.name,vehicle,s.set,true,0)
 end
 
-local function fireBone(vehicle,bone,scale)
-    local p=GetWorldPositionOfEntityBone(vehicle,bone)
+local function spawnFlame(p,heading,scale,r,g,b)
     UseParticleFxAssetNextCall('core')
+    -- Tint applies to the next non-looped particle only, so it is set per flame.
+    if r then SetParticleFxNonLoopedColour(r,g,b) end
     StartParticleFxNonLoopedAtCoord(
         'veh_backfire',
         p.x,p.y,p.z,
-        0.0,0.0,GetEntityHeading(vehicle),
+        0.0,0.0,heading,
         scale,
         false,false,false
     )
 end
 
-local function fireFallback(vehicle,scale)
+local function fireFallback(vehicle,scale,r,g,b)
     local minDim,maxDim=GetModelDimensions(GetEntityModel(vehicle))
     local width=(maxDim.x-minDim.x)*0.26
     local rear=minDim.y-0.10
     local z=minDim.z+(maxDim.z-minDim.z)*0.34
+    local heading=GetEntityHeading(vehicle)
     for _,x in ipairs({-width,width}) do
-        local p=GetOffsetFromEntityInWorldCoords(vehicle,x,rear,z)
-        UseParticleFxAssetNextCall('core')
-        StartParticleFxNonLoopedAtCoord(
-            'veh_backfire',p.x,p.y,p.z,
-            0.0,0.0,GetEntityHeading(vehicle),
-            scale,false,false,false
-        )
+        spawnFlame(GetOffsetFromEntityInWorldCoords(vehicle,x,rear,z),heading,scale,r,g,b)
     end
 end
 
 local lastFlameByVehicle={}
-local function flame(vehicle,big)
+local function flame(vehicle,big,colour)
     if not DoesEntityExist(vehicle) then return end
 
     -- Hard local safety gate: no vehicle can create visual PTFX faster than this.
@@ -154,31 +194,35 @@ local function flame(vehicle,big)
 
     if not loadPtfx() then return end
     local scale=big and Config.BigFlameScale or Config.FlameScale
+    local r,g,b=resolveColour(colour)
+    local heading=GetEntityHeading(vehicle)
     local found=0
     for _,name in ipairs(exhaustNames) do
         if found>=4 then break end
         local bone=GetEntityBoneIndexByName(vehicle,name)
         if bone~=-1 then
-            fireBone(vehicle,bone,scale)
+            spawnFlame(GetWorldPositionOfEntityBone(vehicle,bone),heading,scale,r,g,b)
             found=found+1
         end
     end
-    if found==0 then fireFallback(vehicle,scale) end
+    if found==0 then fireFallback(vehicle,scale,r,g,b) end
 end
 
-RegisterNetEvent('sp_antilag:effect',function(netId,kind,sourceServerId)
+RegisterNetEvent('sp_antilag:effect',function(netId,kind,sourceServerId,colour,withFlame)
     if sourceServerId==GetPlayerServerId(PlayerId()) then return end
     local vehicle=NetToVeh(netId)
     if vehicle==0 or not DoesEntityExist(vehicle) then return end
     if #(GetEntityCoords(PlayerPedId())-GetEntityCoords(vehicle))>Config.Range then return end
     nativeSound(vehicle,kind)
-    flame(vehicle,kind~='pop')
+    if withFlame~=false then flame(vehicle,kind~='pop',colour) end
 end)
 
-local function send(vehicle,kind)
+local function send(vehicle,kind,withFlame)
+    if withFlame==nil then withFlame=true end
+    local settings=settingsOf(vehicle)
     nativeSound(vehicle,kind)
-    flame(vehicle,kind~='pop')
-    TriggerServerEvent('sp_antilag:effect',VehToNet(vehicle),plateOf(vehicle),kind)
+    if withFlame then flame(vehicle,kind~='pop',settings and settings.colour) end
+    TriggerServerEvent('sp_antilag:effect',VehToNet(vehicle),plateOf(vehicle),kind,withFlame)
 end
 
 local function limiterBurst(vehicle)
@@ -196,11 +240,30 @@ local function liftBurst(vehicle)
     send(vehicle,'mega')
 end
 
+-- V4.4 pops & bangs: one irregular overrun shot.
+local function crackleShot(vehicle)
+    local pb=Config.PopsBangs
+    local roll=math.random()
+    if roll<pb.MegaChance then
+        send(vehicle,'mega',true)
+    elseif roll<pb.MegaChance+pb.BangChance then
+        send(vehicle,'bang',true)
+    else
+        send(vehicle,'pop',math.random()<pb.FlameChance)
+    end
+end
+
 local lastThrottle=0.0
 local limiterSince=nil
 local lastLimiter=0
 local lastLift=0
 local activePlate=nil
+local overrunSince=nil
+local nextCrackle=0
+
+local function resetState()
+    limiterSince=nil; lastThrottle=0.0; activePlate=nil; overrunSince=nil
+end
 
 CreateThread(function()
     while true do
@@ -213,7 +276,7 @@ CreateThread(function()
                 local plate=plateOf(vehicle)
                 if activePlate~=plate then
                     activePlate=plate
-                    lib.notify({type='success',description='Anti-lag active on '..plate})
+                    lib.notify({type='success',description='Anti-lag active on '..plate..' - /'..Config.MenuCommand..' to tune'})
                 end
 
                 local throttle=GetControlNormal(0,71)
@@ -238,13 +301,107 @@ CreateThread(function()
                     CreateThread(function() liftBurst(vehicle) end)
                 end
 
+                -- Pops & bangs: keeps crackling on the overrun after the lift burst.
+                local pb=Config.PopsBangs
+                local settings=settingsOf(vehicle)
+                if pb.Enabled and settings and settings.pops
+                and speed>=pb.MinSpeedKmh and throttle<=pb.MaxThrottle then
+                    -- Only starts from a real lift-off, not from rolling with no input.
+                    if not overrunSince and lastThrottle>pb.MaxThrottle then
+                        overrunSince=now
+                        nextCrackle=now+pb.StartDelayMs
+                    end
+                    if overrunSince and now-overrunSince<=pb.MaxDurationMs and now>=nextCrackle then
+                        nextCrackle=now+math.random(pb.MinGapMs,pb.MaxGapMs)
+                        crackleShot(vehicle)
+                    end
+                else
+                    overrunSince=nil
+                end
+
                 lastThrottle=throttle
             else
-                limiterSince=nil; lastThrottle=0.0; activePlate=nil
+                resetState()
             end
         else
-            limiterSince=nil; lastThrottle=0.0; activePlate=nil
+            resetState()
         end
         Wait(sleep)
     end
 end)
+
+---------------------------------------------------------------------
+-- V4.4 settings menu: flame colour + pops & bangs toggle
+---------------------------------------------------------------------
+local function settingsVehicle()
+    local vehicle,reason=currentInstallVehicle()
+    if vehicle==0 then return 0,(reason:gsub('to install anti%-lag','to tune the anti-lag')) end
+    if not installed(vehicle) then return 0,'This vehicle does not have anti-lag fitted.' end
+    if Config.SettingsPermission=='mechanic' and not isMechanic() then return 0,'Only a mechanic can tune the anti-lag.' end
+    return vehicle
+end
+
+local function pushSettings(vehicle,colour,pops)
+    TriggerServerEvent('sp_antilag:updateSettings',VehToNet(vehicle),plateOf(vehicle),colour,pops)
+end
+
+local openMenu
+
+local function openColourMenu(vehicle)
+    local settings=settingsOf(vehicle) or {}
+    local options={}
+    for _,c in ipairs(Config.FlameColours) do
+        local swatch
+        if type(c.rgb)=='table' then swatch=('#%02X%02X%02X'):format(c.rgb[1],c.rgb[2],c.rgb[3]) end
+        options[#options+1]={
+            title=c.label,
+            icon=c.key=='rainbow' and 'rainbow' or 'fire',
+            iconColor=swatch or (c.key=='stock' and '#FF8C1A' or nil),
+            description=settings.colour==c.key and 'Current' or nil,
+            onSelect=function() pushSettings(vehicle,c.key,nil) end
+        }
+    end
+    if Config.AllowCustomColour then
+        options[#options+1]={
+            title='Custom colour...',
+            icon='palette',
+            description=(settings.colour and settings.colour:sub(1,1)=='#') and ('Current: '..settings.colour) or 'Pick any colour',
+            onSelect=function()
+                local input=lib.inputDialog('Custom flame colour',{
+                    { type='color', label='Flame colour', format='hex', required=true,
+                      default=(settings.colour and settings.colour:sub(1,1)=='#') and settings.colour or '#2878FF' }
+                })
+                if input and input[1] then pushSettings(vehicle,input[1],nil) end
+            end
+        }
+    end
+    lib.registerContext({ id='sp_antilag_colours', title='Flame colour', menu='sp_antilag_menu', options=options })
+    lib.showContext('sp_antilag_colours')
+end
+
+openMenu=function()
+    local vehicle,reason=settingsVehicle()
+    if vehicle==0 then return lib.notify({type='error',description=reason}) end
+    local settings=settingsOf(vehicle) or {}
+    local options={
+        {
+            title='Flame colour',
+            description='Current: '..colourLabel(settings.colour),
+            icon='fire',
+            arrow=true,
+            onSelect=function() openColourMenu(vehicle) end
+        }
+    }
+    if Config.PopsBangs.Enabled then
+        options[#options+1]={
+            title='Pops & bangs: '..(settings.pops and 'ON' or 'OFF'),
+            description='Overrun crackle while coasting off throttle',
+            icon=settings.pops and 'toggle-on' or 'toggle-off',
+            onSelect=function() pushSettings(vehicle,nil,not settings.pops) end
+        }
+    end
+    lib.registerContext({ id='sp_antilag_menu', title='Anti-lag ('..plateOf(vehicle)..')', options=options })
+    lib.showContext('sp_antilag_menu')
+end
+
+RegisterCommand(Config.MenuCommand,function() openMenu() end,false)

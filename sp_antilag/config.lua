@@ -24,3 +24,54 @@ Config.LiftCooldownMs = 520
 
 Config.FlameScale = 1.55
 Config.BigFlameScale = 2.15
+
+---------------------------------------------------------------------
+-- V4.4 POPS & BANGS (overrun crackle)
+---------------------------------------------------------------------
+-- A "pops & bangs" map: while coasting off-throttle the exhaust keeps crackling
+-- with irregular pops and the occasional bang until you get back on it or slow down.
+-- Can be switched on/off per vehicle from the /antilag menu.
+Config.PopsBangs = {
+    Enabled = true,          -- master switch for the whole feature
+    DefaultOn = true,        -- state for newly fitted vehicles
+    MinSpeedKmh = 25.0,      -- only crackle above this speed
+    MaxThrottle = 0.08,      -- counts as "off throttle" at or below this
+    StartDelayMs = 350,      -- wait after lift-off before the crackle starts (lets the lift burst play)
+    MaxDurationMs = 4500,    -- stop crackling after this long on the overrun
+    MinGapMs = 90,           -- shortest gap between pops (server rate gate is 70ms)
+    MaxGapMs = 260,          -- longest gap between pops
+    BangChance = 0.14,       -- chance any shot is a bang instead of a pop
+    MegaChance = 0.03,       -- chance any shot is a mega bang
+    FlameChance = 0.55,      -- chance a plain pop also spits a flame (bangs always flame)
+}
+
+---------------------------------------------------------------------
+-- V4.4 FLAME COLOURS
+---------------------------------------------------------------------
+-- Who may change a fitted vehicle's flame colour / pops & bangs setting:
+--   'driver'   = whoever is in the driver seat of a fitted vehicle
+--   'mechanic' = only mechanics (Config.MechanicJobs) in the driver seat
+Config.SettingsPermission = 'driver'
+
+-- Command that opens the settings menu (driver seat of a fitted vehicle).
+Config.MenuCommand = 'antilag'
+
+-- Allow picking any colour with the colour picker, not just the presets.
+Config.AllowCustomColour = true
+
+-- Default colour for newly fitted vehicles (a preset key below).
+Config.DefaultFlameColour = 'stock'
+
+-- The tint is multiplied onto GTA's flame texture, so bright saturated colours read best.
+-- rgb = nil means untouched stock GTA flame. 'rainbow' cycles through the spectrum shot by shot.
+Config.FlameColours = {
+    { key = 'stock',   label = 'Stock (orange)', rgb = nil },
+    { key = 'blue',    label = 'Blue',           rgb = { 40, 120, 255 } },
+    { key = 'cyan',    label = 'Cyan',           rgb = { 0, 230, 255 } },
+    { key = 'green',   label = 'Green',          rgb = { 40, 255, 60 } },
+    { key = 'purple',  label = 'Purple',         rgb = { 170, 60, 255 } },
+    { key = 'pink',    label = 'Pink',           rgb = { 255, 50, 190 } },
+    { key = 'red',     label = 'Red',            rgb = { 255, 25, 25 } },
+    { key = 'white',   label = 'White hot',      rgb = { 255, 255, 255 } },
+    { key = 'rainbow', label = 'Rainbow',        rgb = 'rainbow' },
+}

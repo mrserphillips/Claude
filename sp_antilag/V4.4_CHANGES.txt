@@ -1,0 +1,31 @@
+V4.4 POPS & BANGS + COLOURED FLAMES
+
+POPS & BANGS (overrun crackle)
+- After lifting off the throttle at speed, the exhaust keeps crackling with
+  irregular pops and occasional bangs/mega bangs while you coast.
+- Starts only from a real lift-off (not from rolling with no input), stops when you
+  get back on the throttle, drop below Config.PopsBangs.MinSpeedKmh, or after
+  Config.PopsBangs.MaxDurationMs.
+- Not every pop spits a flame (Config.PopsBangs.FlameChance); bangs always do.
+- Can be switched on/off per vehicle, saved to the plate.
+- Existing limiter and lift-off bursts are unchanged.
+
+COLOURED FLAMES
+- Presets: Stock, Blue, Cyan, Green, Purple, Pink, Red, White hot, Rainbow.
+- Custom colour picker (any hex colour) - toggle with Config.AllowCustomColour.
+- Colour is saved per plate and synced, so everyone nearby sees the same colour.
+- Add/remove/edit presets in Config.FlameColours.
+- Tint is applied to GTA's own veh_backfire flame, so bright saturated colours look best.
+
+MENU
+- Sit in the driver seat of a fitted vehicle and type /antilag
+  (command name: Config.MenuCommand).
+- Config.SettingsPermission = 'driver' (anyone driving it) or 'mechanic' (mechanics only).
+- The server re-checks the driver seat, the plate and the colour value.
+
+DATABASE
+- Two new columns: flame_colour, pops_bangs. Added automatically on start,
+  existing fitted plates are kept (they get Stock colour + pops & bangs ON).
+
+OTHER
+- /removeantilag now uses Config.RemoveTime instead of a hard-coded 10 seconds.
