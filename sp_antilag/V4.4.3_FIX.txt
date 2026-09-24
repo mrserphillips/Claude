@@ -1,0 +1,13 @@
+V4.4.3
+Fixes: "/antilag says the vehicle has no anti-lag, but fitting it says it is already fitted".
+
+Cause: on resource start the server loads plates from the database (and V4.4 adds two
+columns first). A client that asked "is this plate fitted?" before loading finished got
+"no" and cached that answer forever, while the server knew it was fitted.
+
+- Server now waits for the database load before answering, and tells every client to
+  re-check once loading is done.
+- A client-side "not fitted" answer is re-checked every 5 seconds instead of cached forever.
+- If the server rejects an install because it is already fitted (or a removal because it
+  is not), it corrects that player's cache straight away.
+- Fitting is refused with "still loading" in the first moments after a restart.

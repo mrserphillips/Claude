@@ -28,12 +28,18 @@ local function currentInstallVehicle()
 end
 
 -- installedCache[plate] = false, or { colour = ..., pops = true/false }
+-- A "not fitted" answer is only trusted for a few seconds, then asked again.
+local notFittedCheckedAt = {}
+local NOT_FITTED_RECHECK_MS = 5000
 local function settingsOf(vehicle)
     local plate = plateOf(vehicle)
     if plate == '' then return false end
-    if installedCache[plate] ~= nil then return installedCache[plate] end
+    local cached = installedCache[plate]
+    if cached then return cached end
+    if cached == false and GetGameTimer() - (notFittedCheckedAt[plate] or 0) < NOT_FITTED_RECHECK_MS then return false end
     local result = lib.callback.await('sp_antilag:isInstalled', false, plate)
     installedCache[plate] = type(result) == 'table' and result or false
+    notFittedCheckedAt[plate] = GetGameTimer()
     return installedCache[plate]
 end
 
@@ -98,7 +104,14 @@ RegisterCommand('removeantilag', function()
 end, false)
 
 RegisterNetEvent('sp_antilag:setInstalled', function(plate, settings)
-    installedCache[cleanPlate(plate)] = type(settings) == 'table' and settings or false
+    plate = cleanPlate(plate)
+    installedCache[plate] = type(settings) == 'table' and settings or false
+    notFittedCheckedAt[plate] = GetGameTimer()
+end)
+
+RegisterNetEvent('sp_antilag:resync', function()
+    installedCache = {}
+    notFittedCheckedAt = {}
 end)
 
 local exhaustNames={'exhaust','exhaust_2','exhaust_3','exhaust_4','exhaust_5','exhaust_6','exhaust_7','exhaust_8','exhaust_9','exhaust_10','exhaust_11','exhaust_12','exhaust_13','exhaust_14','exhaust_15','exhaust_16'}

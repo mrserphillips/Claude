@@ -1,5 +1,6 @@
 -- installed[plate] = { colour = 'stock' | preset key | '#RRGGBB', pops = true/false }
 local installed = {}
+local ready = false -- true once the plates have been loaded from the database
 
 local function cleanPlate(p)
     return (p or ''):gsub('^%s*(.-)%s*$', '%1'):upper()
@@ -53,9 +54,14 @@ CreateThread(function()
             pops = row.pops_bangs == 1 or row.pops_bangs == true
         }
     end
+    ready = true
+    -- Anyone who asked before loading finished may have cached "not fitted"; make them re-check.
+    TriggerClientEvent('sp_antilag:resync', -1)
 end)
 
 lib.callback.register('sp_antilag:isInstalled', function(_, plate)
+    local untilTime = GetGameTimer() + 15000
+    while not ready and GetGameTimer() < untilTime do Wait(100) end
     return installed[cleanPlate(plate)] or false
 end)
 
@@ -64,7 +70,11 @@ RegisterNetEvent('sp_antilag:requestInstall', function(plate)
     plate=cleanPlate(plate)
     if not isMechanic(src) then return end
     if plate=='' then return end
+    if not ready then
+        return TriggerClientEvent('ox_lib:notify',src,{type='error',description='Anti-lag is still loading, try again in a moment.'})
+    end
     if installed[plate] then
+        TriggerClientEvent('sp_antilag:setInstalled',src,plate,installed[plate])
         return TriggerClientEvent('ox_lib:notify',src,{type='error',description='This vehicle already has anti-lag fitted.'})
     end
     local count=exports.ox_inventory:Search(src,'count',Config.KitItem) or 0
@@ -113,6 +123,7 @@ RegisterNetEvent('sp_antilag:remove', function(netId, expectedPlate)
     end
 
     if not installed[plate] then
+        TriggerClientEvent('sp_antilag:setInstalled',src,plate,false)
         return TriggerClientEvent('ox_lib:notify',src,{type='error',description='This vehicle does not have anti-lag fitted.'})
     end
 
