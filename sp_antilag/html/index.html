@@ -357,7 +357,12 @@ function makeReverb(seconds) {
     const buf = ctx.createBuffer(2, len, ctx.sampleRate);
     for (let c = 0; c < 2; c++) {
         const d = buf.getChannelData(c);
-        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+        // Smoothed noise = a dark impulse, so the echo rumbles instead of hissing.
+        let y = 0;
+        for (let i = 0; i < len; i++) {
+            y += 0.08 * ((Math.random() * 2 - 1) - y);
+            d[i] = y * 4 * Math.pow(1 - i / len, 3);
+        }
     }
     const conv = ctx.createConvolver();
     conv.buffer = buf;
@@ -410,14 +415,22 @@ function envGain(t, peak, dur) {
     return g;
 }
 
-function noiseBurst(t, dur, filterType, freq, q, curve, peak, dest) {
+function noiseBurst(t, dur, filterType, freq, q, curve, peak, dest, post) {
     const src = ctx.createBufferSource();
     src.buffer = noise;
     const f = ctx.createBiquadFilter();
     f.type = filterType; f.frequency.value = freq; f.Q.value = q;
     const ws = ctx.createWaveShaper(); ws.curve = curve;
     const g = envGain(t, peak, dur);
-    src.connect(f); f.connect(ws); ws.connect(g); g.connect(dest);
+    src.connect(f); f.connect(ws);
+    if (post) {
+        const pf = ctx.createBiquadFilter();
+        pf.type = 'lowpass'; pf.frequency.value = post; pf.Q.value = 0.7;
+        ws.connect(pf); pf.connect(g);
+    } else {
+        ws.connect(g);
+    }
+    g.connect(dest);
     src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
 }
 
@@ -435,12 +448,14 @@ function bigBang(volume, muffle, at, prof) {
     const vol = ctx.createGain();
     vol.gain.value = volume;
     out.connect(vol); vol.connect(master);
+    const dark = ctx.createBiquadFilter();
+    dark.type = 'lowpass'; dark.frequency.value = 500;
     const wet = ctx.createGain();
-    wet.gain.value = 0.55;
-    vol.connect(wet); wet.connect(reverbs.long);
+    wet.gain.value = 0.6;
+    vol.connect(dark); dark.connect(wet); wet.connect(reverbs.long);
 
-    noiseBurst(t, 0.035, 'highpass', 400 * P, 0.7, hardShaper, 2.6 * C, out);   // crack
-    noiseBurst(t, 0.30 * scale, 'lowpass', 320 * P, 0.9, hardShaper, 1.6, out); // low rumble
+    noiseBurst(t, 0.025, 'highpass', 400 * P, 0.7, shaper, 1.6 * C, out, 2600);        // crack
+    noiseBurst(t, 0.30 * scale, 'lowpass', 320 * P, 0.9, hardShaper, 1.6, out, 380);  // low rumble
 
     for (const detune of [1, 1.06]) {
         const o = ctx.createOscillator(); o.type = 'triangle';
@@ -449,7 +464,9 @@ function bigBang(volume, muffle, at, prof) {
         const pre = ctx.createGain(); pre.gain.value = 4;
         const ws = ctx.createWaveShaper(); ws.curve = hardShaper;
         const og = envGain(t, 1.5, 0.38 * scale);
-        o.connect(pre); pre.connect(ws); ws.connect(og); og.connect(out);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 520;
+        o.connect(pre); pre.connect(ws); ws.connect(lp); lp.connect(og); og.connect(out);
         o.start(t); o.stop(t + 0.4 * scale);
     }
 
@@ -469,8 +486,10 @@ const DEFAULT_PROFILE = { pitch: 1, length: 1, crack: 1 };
 // boom (resonant bandpass on noise), a sine punch dropping in pitch, and a dark echo.
 const BANGS = {
     //      edge [peak, dur, hp]   body [peak, dur, lp]   pipe [f, q, peak, dur]  punch [f0, f1, peak, dur]  echo
-    bang: { edge: [1.10, 0.007, 1800], body: [1.30, 0.070, 950],  pipe: [165, 7, 1.9, 0.16], punch: [105, 42, 1.25, 0.16], echo: ['short', 0.22] },
-    mega: { edge: [1.35, 0.009, 1600], body: [1.60, 0.100, 800],  pipe: [135, 8, 2.3, 0.24], punch: [90, 34, 1.50, 0.24],  echo: ['long', 0.28] },
+    bang:     { edge: [1.10, 0.007, 1800], body: [1.30, 0.070, 950], pipe: [165, 7, 1.9, 0.16], punch: [105, 42, 1.25, 0.16], sub: null,             echo: ['short', 0.22] },
+    // Mega: big, deep, beefy boom. Barely any edge, long low pipe ring, sub drop, dark echo.
+    mega:     { edge: [0.70, 0.006, 1400], body: [1.70, 0.120, 520], pipe: [95, 9, 2.6, 0.34],  punch: [78, 26, 1.70, 0.36],  sub: [52, 22, 1.5, 0.55], echo: ['long', 0.35] },
+    megaTail: { edge: null,                body: [1.10, 0.090, 480], pipe: [85, 9, 1.8, 0.28],  punch: [70, 24, 1.20, 0.30],  sub: null,             echo: ['long', 0.25] },
 };
 
 function exhaustBang(kind, volume, muffle, at, prof) {
@@ -492,17 +511,32 @@ function exhaustBang(kind, volume, muffle, at, prof) {
     wet.gain.value = k.echo[1];
     vol.connect(dark); dark.connect(wet); wet.connect(reverbs[k.echo[0]]);
 
-    const [eP, eD, eH] = k.edge;
-    noiseBurst(t, eD, 'highpass', eH * P, 0.7, shaper, eP * prof.crack, out);
+    if (k.edge) {
+        const [eP, eD, eH] = k.edge;
+        noiseBurst(t, eD, 'highpass', eH * P, 0.7, shaper, eP * prof.crack, out, 4500);
+    }
 
+    // Distortion turns noise into hiss, so every distorted layer is low-passed after it.
     const [bP, bD, bL] = k.body;
-    noiseBurst(t, bD * L, 'lowpass', bL * P * rnd(0.9, 1.1), 1.1, hardShaper, bP, out);
+    const bf = bL * P * rnd(0.9, 1.1);
+    noiseBurst(t, bD * L, 'lowpass', bf, 1.1, hardShaper, bP, out, bf * 1.4);
 
     // Pipe resonance: ringing tube tone that gives the "boom" its body.
     const [pF, pQ, pP, pD] = k.pipe;
     const pf = pF * P * rnd(0.92, 1.08);
-    noiseBurst(t, pD * L, 'bandpass', pf, pQ, shaper, pP, out);
-    noiseBurst(t + 0.004, pD * 0.7 * L, 'bandpass', pf * 2.4, pQ * 0.7, shaper, pP * 0.35, out);
+    noiseBurst(t, pD * L, 'bandpass', pf, pQ, shaper, pP, out, pf * 3);
+    noiseBurst(t + 0.004, pD * 0.7 * L, 'bandpass', pf * 2.4, pQ * 0.7, shaper, pP * 0.35, out, pf * 5);
+
+    // Sub drop for the mega: the chest thump.
+    if (k.sub) {
+        const [sF0, sF1, sP, sD] = k.sub;
+        const s = ctx.createOscillator(); s.type = 'sine';
+        s.frequency.setValueAtTime(sF0 * P, t);
+        s.frequency.exponentialRampToValueAtTime(sF1, t + sD * L);
+        const sg = envGain(t, sP, sD * L);
+        s.connect(sg); sg.connect(out);
+        s.start(t); s.stop(t + sD * L + 0.02);
+    }
 
     // Punch: overdriven sine dropping in pitch, felt more than heard.
     const [f0, f1, oP, oD] = k.punch;
@@ -513,11 +547,13 @@ function exhaustBang(kind, volume, muffle, at, prof) {
     const pre = ctx.createGain(); pre.gain.value = 2.2;
     const ws = ctx.createWaveShaper(); ws.curve = shaper;
     const og = envGain(t, oP, oD * L);
-    o.connect(pre); pre.connect(ws); ws.connect(og); og.connect(out);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = f0 * P * 5;
+    o.connect(pre); pre.connect(ws); ws.connect(lp); lp.connect(og); og.connect(out);
     o.start(t); o.stop(t + oD * L + 0.02);
 
     // Mega is a double report: a quieter second bang right behind the first.
-    if (kind === 'mega' && !at) exhaustBang('bang', volume * 0.7, muffle, t + rnd(0.06, 0.1), prof);
+    if (kind === 'mega' && !at) exhaustBang('megaTail', volume * 0.75, muffle, t + rnd(0.06, 0.1), prof);
 }
 
 function shot(kind, volume, muffle, at, prof) {
