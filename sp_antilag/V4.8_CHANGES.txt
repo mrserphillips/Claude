@@ -1,0 +1,7 @@
+V4.8
+- BIG bang camera shake toned right down: Config.BigBang.Shake 0.12 -> 0.025, range 20m -> 12m.
+  Sound unchanged.
+- Gear change bangs: every upshift while driving fires pop, pop, bang, BIG
+  (Config.GearChange: Enabled, Downshifts, MinSpeedKmh, CooldownMs, Sequence).
+- /antilagfx now fires each flame option in RED, then GREEN, then BLUE, so you can see at a
+  glance whether that option takes colour. Added a 'Wreck fire' flame option.

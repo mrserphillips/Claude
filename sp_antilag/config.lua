@@ -46,10 +46,19 @@ Config.BigBang = {
     CrackleFinale = true,    -- end every overrun crackle with a BIG bang
     FinaleDelayMs = 150,     -- pause after the last crackle before the BIG bang
     CrackleChance = 0.04,    -- chance any crackle shot is a BIG bang
-    Shake = 0.12,            -- camera shake for players close by (0 = off)
-    ShakeRange = 20.0,       -- metres
+    Shake = 0.025,           -- camera shake for players close by (0 = off, 0.1 = heavy)
+    ShakeRange = 12.0,       -- metres
 }
 Config.HugeFlameScale = 3.0  -- flame size for BIG bangs
+
+-- Gear change: pops -> bang -> BIG bang on every shift while driving.
+Config.GearChange = {
+    Enabled = true,
+    Downshifts = false,      -- true = also fire on downshifts
+    MinSpeedKmh = 10.0,
+    CooldownMs = 700,        -- ignore shifts closer together than this
+    Sequence = { { 'pop', 80 }, { 'pop', 85 }, { 'bang', 180 }, { 'big', 0 } },
+}
 
 Config.FlameScale = 1.55
 Config.BigFlameScale = 2.15
@@ -108,6 +117,7 @@ Config.ColourFxOptions = {
     { label = 'Jet afterburner flame',       asset = 'core', name = 'veh_exhaust_afterburner', scale = 1.2, looped = true, durationMs = 170, hideStock = true },
     { label = 'Fire jet (A)',                asset = 'core', name = 'ent_sht_flame', scale = 0.6, looped = true, durationMs = 170, rot = { 90.0, 0.0, 0.0 }, hideStock = true },
     { label = 'Fire jet (B)',                asset = 'core', name = 'ent_sht_flame', scale = 0.6, looped = true, durationMs = 170, rot = { -90.0, 0.0, 0.0 }, hideStock = true },
+    { label = 'Wreck fire',                  asset = 'core', name = 'fire_wrecked_plane_cockpit', scale = 0.35, looped = true, durationMs = 200, hideStock = true },
     { label = 'Tinted backfire (one-shot)',  asset = 'core', name = 'veh_backfire', scale = 1.0, looped = false, hideStock = true },
     { label = 'Tinted backfire (looped)',    asset = 'core', name = 'veh_backfire', scale = 1.0, looped = true, durationMs = 140, hideStock = true },
 }

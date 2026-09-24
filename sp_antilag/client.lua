@@ -344,8 +344,11 @@ local overrunSince=nil
 local finaleDone=false
 local nextCrackle=0
 
+local lastGear=nil
+local lastGearShot=0
+
 local function resetState()
-    limiterSince=nil; lastThrottle=0.0; activePlate=nil; overrunSince=nil
+    limiterSince=nil; lastThrottle=0.0; activePlate=nil; overrunSince=nil; lastGear=nil
 end
 
 CreateThread(function()
@@ -407,6 +410,17 @@ CreateThread(function()
                 else
                     overrunSince=nil
                 end
+
+                -- Gear change: fire Config.GearChange.Sequence on each shift.
+                local gc=Config.GearChange
+                local gear=GetVehicleCurrentGear(vehicle)
+                if gc.Enabled and lastGear and gear~=lastGear and gear>0 and lastGear>0
+                and (gear>lastGear or gc.Downshifts)
+                and speed>=gc.MinSpeedKmh and now-lastGearShot>=gc.CooldownMs then
+                    lastGearShot=now
+                    CreateThread(function() burst(vehicle,gc.Sequence) end)
+                end
+                lastGear=gear
 
                 lastThrottle=throttle
             else
@@ -518,20 +532,21 @@ print(('^2[sp_antilag] client v%s loaded (sound mode: %s)^7'):format(GetResource
 RegisterCommand('antilagfx',function(_,args)
     local vehicle=GetVehiclePedIsIn(PlayerPedId(),false)
     if vehicle==0 then return lib.notify({type='error',description='Sit in a vehicle to test flame effects.'}) end
-    local colour=(settingsOf(vehicle) or {}).colour
-    if not resolveColour(colour) then colour='blue' end
+    -- Each option fires red, then green, then blue: if all three look the same (orange),
+    -- that effect does not take colour on this game build.
+    local testColours={'red','green','blue'}
     local only=tonumber(args[1])
     CreateThread(function()
         for i,fx in ipairs(Config.ColourFxOptions) do
             if not only or only==i then
-                lib.notify({description=('Flame FX %d: %s'):format(i,fx.label or fx.name),duration=2500})
+                lib.notify({description=('Flame FX %d: %s (red, green, blue)'):format(i,fx.label or fx.name),duration=3500})
                 for n=1,3 do
                     lastFlameByVehicle={}
-                    flame(vehicle,n==3,colour,fx)
-                    playSound(vehicle,n==3 and 'bang' or 'pop')
-                    Wait(n==3 and 900 or 250)
+                    flame(vehicle,true,testColours[n],fx)
+                    playSound(vehicle,'pop')
+                    Wait(700)
                 end
-                Wait(600)
+                Wait(900)
             end
         end
     end)
