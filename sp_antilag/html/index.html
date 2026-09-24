@@ -487,11 +487,14 @@ const DEFAULT_PROFILE = { pitch: 1, length: 1, crack: 1 };
 // a second, 13-35ms apart (median 22ms), level jumping about +-2dB hit to hit. Energy peaks
 // at 150-250Hz with a crisp rattle band at 2.5-6kHz. Each networked pop/bang plays one
 // short rattle; back-to-back shots from the 2-step run together into a continuous brrrap.
-//   hits = [min, max] micro-hits per shot, first = level of the opening hit
+//   hits = [min, max] micro-hits per shot, first = level of the opening hit,
+//   accent = chance any micro-hit is a loud bang (x ACCENT_LEVEL, with its own thump)
 const RATTLE = {
-    pop:  { hits: [3, 5], first: 1.0,  body: 1.00, thump: 0.10 },
-    bang: { hits: [5, 8], first: 1.45, body: 1.25, thump: 0.20 },
+    pop:  { hits: [3, 5], first: 1.0,  body: 1.00, thump: 0.10, accent: 0.08 },
+    bang: { hits: [5, 8], first: 1.45, body: 1.25, thump: 0.20, accent: 0.18 },
 };
+const RATTLE_GAIN = 1.8;   // overall rattle loudness (about +5dB)
+const ACCENT_LEVEL = 2.0;  // loud bangs inside the rattle
 
 function microHit(t, lvl, prof, out) {
     const P = prof.pitch, L = prof.length;
@@ -510,7 +513,7 @@ function rattle(kind, volume, muffle, t, prof) {
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass'; hp.frequency.value = 85;
     const vol = ctx.createGain();
-    vol.gain.value = volume;
+    vol.gain.value = volume * RATTLE_GAIN;
     out.connect(hp); hp.connect(vol); vol.connect(master);
     const dark = ctx.createBiquadFilter();
     dark.type = 'lowpass'; dark.frequency.value = 700;
@@ -528,7 +531,15 @@ function rattle(kind, volume, muffle, t, prof) {
     let at = t;
     for (let i = 0; i < n; i++) {
         const jitter = Math.pow(10, rnd(-2.2, 2.2) / 20);
-        microHit(at, (i === 0 ? k.first : 1) * k.body * jitter * (1 - 0.06 * i), prof, out);
+        const accent = i > 0 && Math.random() < k.accent;
+        microHit(at, (i === 0 ? k.first : accent ? ACCENT_LEVEL : 1) * k.body * jitter * (1 - 0.06 * i), prof, out);
+        if (accent) {
+            const a = ctx.createOscillator(); a.type = 'sine';
+            a.frequency.value = 120 * prof.pitch;
+            const ag = envGain(at, k.thump * 1.2, 0.05 * prof.length);
+            a.connect(ag); ag.connect(out);
+            a.start(at); a.stop(at + 0.07 * prof.length);
+        }
         // 13-35ms apart, most around 20ms.
         at += (13 + Math.pow(Math.random(), 1.6) * 22) / 1000;
     }

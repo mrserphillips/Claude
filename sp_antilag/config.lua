@@ -75,8 +75,8 @@ Config.PopsBangs = {
     MaxDurationMs = 4500,    -- stop crackling after this long on the overrun
     MinGapMs = 90,           -- shortest gap between pops (server rate gate is 70ms)
     MaxGapMs = 260,          -- longest gap between pops
-    BangChance = 0.30,       -- chance any shot is a bang instead of a pop
-    MegaChance = 0.15,       -- chance any shot is a mega bang
+    BangChance = 0.40,       -- chance any shot is a bang instead of a pop
+    MegaChance = 0.18,       -- chance any shot is a mega bang
     FlameChance = 0.55,      -- chance a plain pop also spits a flame (bangs always flame)
 }
 
@@ -192,17 +192,17 @@ Config.Intensity = {
     soft = {
         label = 'Soft', flame = 0.80, chance = 0.80, maxSpeed = 8.0,
         gap = { 190, 270 },
-        mix = { pop = 0.70, bang = 0.30 },
+        mix = { pop = 0.60, bang = 0.40 },
     },
     moderate = {
         label = 'Moderate', flame = 1.00, chance = 0.95, maxSpeed = 12.0,
         gap = { 130, 180 },
-        mix = { pop = 0.45, bang = 0.47, mega = 0.08 },
+        mix = { pop = 0.36, bang = 0.52, mega = 0.12 },
     },
     max = {
         label = 'Maximum', flame = 1.25, chance = 1.0, maxSpeed = 16.0,
         gap = { 105, 150 },
-        mix = { pop = 0.30, bang = 0.50, mega = 0.15, big = 0.05 },
+        mix = { pop = 0.24, bang = 0.54, mega = 0.16, big = 0.06 },
     },
 }
 

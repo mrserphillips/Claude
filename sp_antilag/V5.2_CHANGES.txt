@@ -6,3 +6,10 @@ V5.2 - Supra-style anti-lag rattle
   brrrrap at ~40 hits a second, like the recording. Overrun crackle gives separate braps.
 - The micro-hits are played by each client from the one networked shot, so network
   traffic is unchanged. Mega and BIG bangs keep the gunshot sound.
+
+V5.2.1
+- Rattle about 6dB louder (RATTLE_GAIN in html/index.html).
+- Loud accent bangs inside the rattle: 8% of pop micro-hits, 18% of bang micro-hits hit
+  at 2x level with a thump under them.
+- More bangs: overrun crackle BangChance 0.30 -> 0.40, MegaChance 0.15 -> 0.18; 2-step mix
+  shifted towards bang/mega at every intensity.
