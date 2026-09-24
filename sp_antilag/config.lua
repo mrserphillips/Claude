@@ -73,6 +73,14 @@ Config.DefaultFlameColour = 'stock'
 
 -- The tint is multiplied onto GTA's flame texture, so bright saturated colours read best.
 -- rgb = nil means untouched stock GTA flame. 'rainbow' cycles through the spectrum shot by shot.
+-- How long a coloured (looped) flame burns before it is stopped, in ms.
+Config.ColouredFlameMs = 140
+
+-- Coloured light flash at the exhaust on every flame (also for stock, in orange).
+Config.FlameGlow = true
+Config.FlameGlowRange = 3.0       -- metres
+Config.FlameGlowIntensity = 8.0
+
 Config.FlameColours = {
     { key = 'stock',   label = 'Stock (orange)', rgb = nil },
     { key = 'blue',    label = 'Blue',           rgb = { 40, 120, 255 } },

@@ -192,28 +192,52 @@ local function playSound(vehicle,kind)
     if Config.SoundMode=='native' then nativeSound(vehicle,kind) else synthSound(vehicle,kind) end
 end
 
+local STOCK_GLOW={1.0,0.47,0.08}
+
+-- Coloured flames use a LOOPED particle, because GTA only reliably honours tint on looped
+-- effects. It is started at the exhaust and stopped a moment later, so it still reads as a
+-- single burst. Stock flames keep the original one-shot particle.
 local function spawnFlame(p,heading,scale,r,g,b)
     UseParticleFxAssetNextCall('core')
-    -- Tint applies to the next non-looped particle only, so it is set per flame.
-    if r then SetParticleFxNonLoopedColour(r,g,b) end
-    StartParticleFxNonLoopedAtCoord(
-        'veh_backfire',
-        p.x,p.y,p.z,
-        0.0,0.0,heading,
-        scale,
-        false,false,false
-    )
+    if not r then
+        StartParticleFxNonLoopedAtCoord('veh_backfire',p.x,p.y,p.z,0.0,0.0,heading,scale,false,false,false)
+        return
+    end
+    local fx=StartParticleFxLoopedAtCoord('veh_backfire',p.x,p.y,p.z,0.0,0.0,heading,scale,false,false,false,false)
+    if not fx or fx==0 then return end
+    SetParticleFxLoopedColour(fx,r,g,b,false)
+    SetTimeout(Config.ColouredFlameMs,function()
+        StopParticleFxLooped(fx,false)
+        RemoveParticleFx(fx,false)
+    end)
 end
 
-local function fireFallback(vehicle,scale,r,g,b)
+-- Short coloured light flash at each exhaust: the colour always shows on the car and
+-- the ground, even where the particle itself cannot be tinted.
+local function glow(points,r,g,b,big)
+    if not Config.FlameGlow then return end
+    if not r then r,g,b=STOCK_GLOW[1],STOCK_GLOW[2],STOCK_GLOW[3] end
+    local range=big and Config.FlameGlowRange*1.4 or Config.FlameGlowRange
+    local intensity=big and Config.FlameGlowIntensity*1.5 or Config.FlameGlowIntensity
+    local R,G,B=math.floor(r*255),math.floor(g*255),math.floor(b*255)
+    CreateThread(function()
+        local untilTime=GetGameTimer()+(big and 160 or 100)
+        while GetGameTimer()<untilTime do
+            for _,p in ipairs(points) do DrawLightWithRange(p.x,p.y,p.z,R,G,B,range,intensity) end
+            Wait(0)
+        end
+    end)
+end
+
+local function fallbackPoints(vehicle)
     local minDim,maxDim=GetModelDimensions(GetEntityModel(vehicle))
     local width=(maxDim.x-minDim.x)*0.26
     local rear=minDim.y-0.10
     local z=minDim.z+(maxDim.z-minDim.z)*0.34
-    local heading=GetEntityHeading(vehicle)
-    for _,x in ipairs({-width,width}) do
-        spawnFlame(GetOffsetFromEntityInWorldCoords(vehicle,x,rear,z),heading,scale,r,g,b)
-    end
+    return {
+        GetOffsetFromEntityInWorldCoords(vehicle,-width,rear,z),
+        GetOffsetFromEntityInWorldCoords(vehicle,width,rear,z)
+    }
 end
 
 local lastFlameByVehicle={}
@@ -232,16 +256,15 @@ local function flame(vehicle,big,colour)
     local scale=big and Config.BigFlameScale or Config.FlameScale
     local r,g,b=resolveColour(colour)
     local heading=GetEntityHeading(vehicle)
-    local found=0
+    local points={}
     for _,name in ipairs(exhaustNames) do
-        if found>=4 then break end
+        if #points>=4 then break end
         local bone=GetEntityBoneIndexByName(vehicle,name)
-        if bone~=-1 then
-            spawnFlame(GetWorldPositionOfEntityBone(vehicle,bone),heading,scale,r,g,b)
-            found=found+1
-        end
+        if bone~=-1 then points[#points+1]=GetWorldPositionOfEntityBone(vehicle,bone) end
     end
-    if found==0 then fireFallback(vehicle,scale,r,g,b) end
+    if #points==0 then points=fallbackPoints(vehicle) end
+    for _,p in ipairs(points) do spawnFlame(p,heading,scale,r,g,b) end
+    glow(points,r,g,b,big)
 end
 
 RegisterNetEvent('sp_antilag:effect',function(netId,kind,sourceServerId,colour,withFlame)

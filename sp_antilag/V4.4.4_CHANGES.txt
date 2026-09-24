@@ -1,0 +1,13 @@
+V4.4.4 BANGS + COLOURS
+BANGS
+- Bang and mega bang rebuilt: sharp broadband crack + main report + low boom + street echo.
+  Bangs are now ~17 dB louder than pops (previously ~6 dB, which read as "a bigger pop").
+- Mega bang has a longer echo and a second report.
+- Output limiter now only catches clipping instead of squashing bangs down to pop level,
+  plus a soft clipper so stacked bangs never distort.
+
+COLOURS
+- Coloured flames now use a looped veh_backfire with SetParticleFxLoopedColour, stopped after
+  Config.ColouredFlameMs. The previous one-shot particle ignored the tint on many setups.
+- New coloured light flash at every exhaust on each flame (Config.FlameGlow, FlameGlowRange,
+  FlameGlowIntensity). This always shows the chosen colour. Stock flames flash orange.
