@@ -93,20 +93,23 @@ Config.DefaultFlameColour = 'stock'
 
 -- The tint is multiplied onto GTA's flame texture, so bright saturated colours read best.
 -- rgb = nil means untouched stock GTA flame. 'rainbow' cycles through the spectrum shot by shot.
--- How coloured flames are drawn. GTA's backfire flame is orange and a tint multiplies it,
--- so it cannot turn blue/green/etc by itself. A second, tintable effect is added instead.
+-- How coloured flames are drawn. GTA's normal backfire flame is orange and ignores tint, so
+-- coloured flames use a different GTA FLAME effect that is tinted instead.
 -- In a car, type /antilagfx to see every option below in your colour (or /antilagfx 3 for one),
 -- then set Config.ColourFx to the number that looks best.
---   hideStock = true  -> only the coloured effect (no orange flame underneath)
+--   hideStock = true  -> only the coloured flame (no orange flame underneath)
+--   rot = { pitch, roll, yaw } to aim the flame out of the back of the car
+-- Got a custom recoloured flame particle (.ypt) streamed on your server? Add it here as
+-- another entry with its asset and effect name.
 Config.ColourFx = 1
 Config.ColourFxOptions = {
-    { label = 'Firework shot burst',       asset = 'scr_indep_fireworks', name = 'scr_indep_firework_shotburst', scale = 0.35, hideStock = true },
-    { label = 'Firework shot + flame',     asset = 'scr_indep_fireworks', name = 'scr_indep_firework_shotburst', scale = 0.30, hideStock = false },
-    { label = 'Firework trail burst',      asset = 'scr_indep_fireworks', name = 'scr_indep_firework_trailburst', scale = 0.20, hideStock = true },
-    { label = 'Firework fountain (A)',     asset = 'scr_indep_fireworks', name = 'scr_indep_firework_fountain', scale = 0.45, looped = true, durationMs = 180, rot = { 90.0, 0.0, 0.0 }, hideStock = true },
-    { label = 'Firework fountain (B)',     asset = 'scr_indep_fireworks', name = 'scr_indep_firework_fountain', scale = 0.45, looped = true, durationMs = 180, rot = { -90.0, 0.0, 0.0 }, hideStock = true },
-    { label = 'Nitrous exhaust flame',     asset = 'veh_xs_vehicle_mods', name = 'veh_nitrous', scale = 1.0, looped = true, durationMs = 160, hideStock = true },
-    { label = 'Tinted backfire (old way)', asset = 'core', name = 'veh_backfire', scale = 1.0, looped = true, durationMs = 140, hideStock = true },
+    { label = 'Nitrous exhaust flame',       asset = 'veh_xs_vehicle_mods', name = 'veh_nitrous', scale = 1.2, looped = true, durationMs = 170, hideStock = true },
+    { label = 'Nitrous + stock flame',       asset = 'veh_xs_vehicle_mods', name = 'veh_nitrous', scale = 1.0, looped = true, durationMs = 170, hideStock = false },
+    { label = 'Jet afterburner flame',       asset = 'core', name = 'veh_exhaust_afterburner', scale = 1.2, looped = true, durationMs = 170, hideStock = true },
+    { label = 'Fire jet (A)',                asset = 'core', name = 'ent_sht_flame', scale = 0.6, looped = true, durationMs = 170, rot = { 90.0, 0.0, 0.0 }, hideStock = true },
+    { label = 'Fire jet (B)',                asset = 'core', name = 'ent_sht_flame', scale = 0.6, looped = true, durationMs = 170, rot = { -90.0, 0.0, 0.0 }, hideStock = true },
+    { label = 'Tinted backfire (one-shot)',  asset = 'core', name = 'veh_backfire', scale = 1.0, looped = false, hideStock = true },
+    { label = 'Tinted backfire (looped)',    asset = 'core', name = 'veh_backfire', scale = 1.0, looped = true, durationMs = 140, hideStock = true },
 }
 
 -- Coloured light flash at the exhaust on every flame (also for stock, in orange).

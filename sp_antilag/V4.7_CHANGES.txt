@@ -1,0 +1,14 @@
+V4.7
+SOUND
+- Pops, bangs and megas restored to the V4.4.4 sound (the first preview, "v1").
+- BIG bang kept, rebuilt to match v1: hard crack, low 320Hz rumble, two overdriven tones
+  dropping 95->25Hz, a 58->20Hz sub drop and v1's long street echo.
+- Where BIG bangs happen is unchanged from V4.6 (end of limiter/lift bursts, crackle finale,
+  4% mid-crackle) - see Config.BigBang and the sequences.
+
+COLOURED FLAMES
+- Firework effects removed (they spat stars). Config.ColourFxOptions is now flames only:
+  nitrous exhaust flame (default), nitrous + stock, jet afterburner, fire jet (two aims),
+  tinted backfire one-shot / looped.
+- /antilagfx cycles them in your colour; set Config.ColourFx to the one that works.
+- A custom recoloured flame particle (.ypt) streamed on the server can be added as an option.

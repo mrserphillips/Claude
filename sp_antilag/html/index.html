@@ -6,11 +6,26 @@
 // Synthesised exhaust pops / bangs. Nothing is prerecorded: every shot is built from
 // noise + a sub "thump" with slight randomisation so no two hits sound identical.
 let ctx = null, master = null, noise = null, shaper = null, hardShaper = null;
+const reverbs = {};
 
 function makeCurve(k) {
     const n = 2048, curve = new Float32Array(n);
     for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curve[i] = Math.tanh(x * k); }
     return curve;
+}
+
+// Decaying-noise impulse = the echo of a bang bouncing off the street.
+function makeReverb(seconds) {
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+        const d = buf.getChannelData(c);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    }
+    const conv = ctx.createConvolver();
+    conv.buffer = buf;
+    conv.connect(master);
+    return conv;
 }
 
 function init(existing) {
@@ -34,30 +49,44 @@ function init(existing) {
 
     shaper = makeCurve(4);
     hardShaper = makeCurve(12);
+    reverbs.short = makeReverb(0.7);
+    reverbs.long = makeReverb(1.4);
 }
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 
-// Every shot = crack (tiny full-band impulse) + punch (overdriven pitch-dropping tone, the
-// part you feel) + a short body of filtered noise. Kept SHORT on purpose: a long noise tail
-// sounds like a dump valve / air release instead of a bang.
+// crack = sharp bright front edge, body = the main report, boom = low thump, echo = tail.
 const KINDS = {
-    //     crack gain/len,   punch Hz from->to, len, gain, drive,  body filter Hz, len, gain,  slapback
-    pop:  { crack: [0.35, 0.006], punch: [220, 90, 0.035, 0.35, 'soft'], body: [1400, 0.05, 0.35], slap: 0 },
-    bang: { crack: [1.80, 0.008], punch: [170, 55, 0.090, 1.40, 'hard'], body: [900,  0.07, 1.10], slap: 0.18 },
-    mega: { crack: [2.50, 0.010], punch: [140, 40, 0.140, 1.80, 'hard'], body: [700,  0.10, 1.40], slap: 0.28 },
+    pop:  { crack: [0.30, 0.010, 2500], body: ['bandpass', [900, 1900], 0.9, 0.07, 0.45, false],
+            boom: [140, 60, 0.06, 0.35], echo: null },
+    bang: { crack: [1.60, 0.028, 700],  body: ['lowpass', [2800, 3800], 0.8, 0.20, 1.30, true],
+            boom: [120, 42, 0.26, 1.00], echo: ['short', 0.35] },
+    mega: { crack: [2.20, 0.040, 500],  body: ['lowpass', [3000, 4200], 0.7, 0.34, 1.60, true],
+            boom: [100, 32, 0.40, 1.20], echo: ['long', 0.45] },
 };
 
 function envGain(t, peak, dur) {
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(peak, t + 0.001);
+    g.gain.linearRampToValueAtTime(peak, t + 0.0015);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     return g;
 }
 
-// BIG bang: its own recipe, deliberately a different animal to the crackle. Much deeper,
-// longer punch, a sub drop you feel, a short low rumble and a double echo down the street.
+function noiseBurst(t, dur, filterType, freq, q, curve, peak, dest) {
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    const f = ctx.createBiquadFilter();
+    f.type = filterType; f.frequency.value = freq; f.Q.value = q;
+    const ws = ctx.createWaveShaper(); ws.curve = curve;
+    const g = envGain(t, peak, dur);
+    src.connect(f); f.connect(ws); ws.connect(g); g.connect(dest);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+}
+
+// BIG bang: a separate, much deeper explosion on top of the normal crackle sounds.
+// Hard crack, two overdriven tones dropping to 25Hz, a sub you feel, low rumble,
+// then the long street echo.
 function bigBang(volume, muffle, at) {
     const t = at || ctx.currentTime + 0.005;
     const scale = rnd(0.94, 1.06);
@@ -68,53 +97,38 @@ function bigBang(volume, muffle, at) {
     const vol = ctx.createGain();
     vol.gain.value = volume;
     out.connect(vol); vol.connect(master);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.55;
+    vol.connect(wet); wet.connect(reverbs.long);
 
-    // Crack: longer and harder than any crackle shot.
-    const c = ctx.createBufferSource(); c.buffer = noise;
-    const cws = ctx.createWaveShaper(); cws.curve = hardShaper;
-    const cg = envGain(t, 3.0, 0.018);
-    c.connect(cws); cws.connect(cg); cg.connect(out);
-    c.start(t, Math.random() * 0.5); c.stop(t + 0.03);
+    noiseBurst(t, 0.035, 'highpass', 400, 0.7, hardShaper, 2.6, out);   // crack
+    noiseBurst(t, 0.30 * scale, 'lowpass', 320, 0.9, hardShaper, 1.6, out); // low rumble
 
-    // Punch: two detuned overdriven tones dropping 110 -> 28 Hz.
-    for (const detune of [1, 1.07]) {
+    for (const detune of [1, 1.06]) {
         const o = ctx.createOscillator(); o.type = 'triangle';
-        o.frequency.setValueAtTime(110 * scale * detune, t);
-        o.frequency.exponentialRampToValueAtTime(28, t + 0.28);
+        o.frequency.setValueAtTime(95 * scale * detune, t);
+        o.frequency.exponentialRampToValueAtTime(25, t + 0.35);
         const pre = ctx.createGain(); pre.gain.value = 4;
         const ws = ctx.createWaveShaper(); ws.curve = hardShaper;
-        const og = envGain(t, 1.6, 0.30 * scale);
+        const og = envGain(t, 1.5, 0.38 * scale);
         o.connect(pre); pre.connect(ws); ws.connect(og); og.connect(out);
-        o.start(t); o.stop(t + 0.32 * scale);
+        o.start(t); o.stop(t + 0.4 * scale);
     }
 
-    // Sub: clean sine you feel on speakers/subs.
     const sub = ctx.createOscillator(); sub.type = 'sine';
-    sub.frequency.setValueAtTime(65, t);
-    sub.frequency.exponentialRampToValueAtTime(24, t + 0.45);
-    const sg = envGain(t, 1.4, 0.45);
+    sub.frequency.setValueAtTime(58, t);
+    sub.frequency.exponentialRampToValueAtTime(20, t + 0.6);
+    const sg = envGain(t, 1.6, 0.6);
     sub.connect(sg); sg.connect(out);
-    sub.start(t); sub.stop(t + 0.47);
-
-    // Rumble: LOW filtered noise only, so it booms instead of hissing.
-    const n = ctx.createBufferSource(); n.buffer = noise;
-    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; f.Q.value = 0.9;
-    const nws = ctx.createWaveShaper(); nws.curve = hardShaper;
-    const ng = envGain(t, 1.5, 0.22 * scale);
-    n.connect(f); f.connect(nws); nws.connect(ng); ng.connect(out);
-    n.start(t, Math.random() * 0.5); n.stop(t + 0.25);
-
-    // Double echo off the buildings.
-    shot('mega', volume * 0.30, Math.min(1, muffle + 0.45), t + rnd(0.12, 0.16), true);
-    shot('bang', volume * 0.16, Math.min(1, muffle + 0.6), t + rnd(0.27, 0.33), true);
+    sub.start(t); sub.stop(t + 0.62);
 }
 
-function shot(kind, volume, muffle, at, noSlap) {
+function shot(kind, volume, muffle, at) {
     if (kind === 'big') return bigBang(volume, muffle, at);
     const k = KINDS[kind] || KINDS.pop;
     const t = at || ctx.currentTime + 0.005;
-    const scale = rnd(0.9, 1.1);
-    const curve = k.punch[4] === 'hard' ? hardShaper : shaper;
+    const scale = rnd(0.88, 1.12);
+    const hard = k.body[5];
 
     // Distance muffling: further away = duller.
     const out = ctx.createBiquadFilter();
@@ -123,38 +137,29 @@ function shot(kind, volume, muffle, at, noSlap) {
     const vol = ctx.createGain();
     vol.gain.value = volume;
     out.connect(vol); vol.connect(master);
+    if (k.echo) {
+        const wet = ctx.createGain();
+        wet.gain.value = k.echo[1];
+        vol.connect(wet); wet.connect(reverbs[k.echo[0]]);
+    }
 
-    // Crack
-    const c = ctx.createBufferSource(); c.buffer = noise;
-    const cg = envGain(t, k.crack[0], k.crack[1]);
-    c.connect(cg); cg.connect(out);
-    c.start(t, Math.random() * 0.5); c.stop(t + k.crack[1] + 0.01);
+    const [cPeak, cDur, cHp] = k.crack;
+    noiseBurst(t, cDur, 'highpass', cHp, 0.7, hard ? hardShaper : shaper, cPeak, out);
 
-    // Punch: overdriving the tone adds harmonics, so it is heard on headsets, not just subs.
-    const [f0, f1, pDur, pGain] = k.punch;
-    const o = ctx.createOscillator(); o.type = 'triangle';
+    const [bType, bF, bQ, bDur, bGain] = k.body;
+    noiseBurst(t, bDur * scale, bType, rnd(bF[0], bF[1]), bQ, hard ? hardShaper : shaper, bGain, out);
+
+    const [f0, f1, oDur, oGain] = k.boom;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
     o.frequency.setValueAtTime(f0 * scale, t);
-    o.frequency.exponentialRampToValueAtTime(f1, t + pDur);
-    const pre = ctx.createGain(); pre.gain.value = 3;
-    const ws = ctx.createWaveShaper(); ws.curve = curve;
-    const og = envGain(t, pGain, pDur * scale);
-    o.connect(pre); pre.connect(ws); ws.connect(og); og.connect(out);
-    o.start(t); o.stop(t + pDur * scale + 0.01);
+    o.frequency.exponentialRampToValueAtTime(f1, t + oDur);
+    const og = envGain(t, oGain, oDur * scale);
+    o.connect(og); og.connect(out);
+    o.start(t); o.stop(t + oDur * scale + 0.02);
 
-    // Body
-    const [bF, bDur, bGain] = k.body;
-    const n = ctx.createBufferSource(); n.buffer = noise;
-    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = bF * rnd(0.85, 1.2); f.Q.value = 0.8;
-    const bws = ctx.createWaveShaper(); bws.curve = curve;
-    const bg = envGain(t, bGain, bDur * scale);
-    n.connect(f); f.connect(bws); bws.connect(bg); bg.connect(out);
-    n.start(t, Math.random() * 0.5); n.stop(t + bDur * scale + 0.01);
-
-    // Slapback: ONE discrete echo off the buildings, not a hissy reverb tail.
-    if (k.slap && !noSlap) shot(kind === 'mega' ? 'bang' : 'pop', volume * k.slap, Math.min(1, muffle + 0.35), t + rnd(0.09, 0.14), true);
-
-    // Mega = a double report.
-    if (kind === 'mega' && !noSlap) shot('bang', volume * 0.8, muffle, t + rnd(0.035, 0.06), true);
+    // Mega gets a second, slightly delayed report.
+    if (kind === 'mega' && !at) shot('bang', volume * 0.75, muffle, t + rnd(0.05, 0.09));
 }
 
 window.addEventListener('message', (e) => {
