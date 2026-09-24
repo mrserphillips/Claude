@@ -429,7 +429,7 @@ function noiseBurst(t, dur, filterType, freq, q, curve, peak, dest, post) {
 // kick drum); the "gunshot" is an instant clipped crack + a short thump + slapback echo
 // off the buildings around the car.
 //   size: 1 = BIG, smaller = mega.   tone: centre of the crack body in Hz.
-function gunshot(volume, muffle, at, prof, size, tone) {
+function gunshot(volume, muffle, at, prof, size, tone, dry) {
     const t = at || ctx.currentTime + 0.005;
     const P = prof.pitch, L = prof.length, C = prof.crack;
 
@@ -441,7 +441,8 @@ function gunshot(volume, muffle, at, prof, size, tone) {
     out.connect(vol); vol.connect(master);
 
     // Slapback: two dull, delayed reflections, then a short dark room tail.
-    for (const [delay, lp, g] of [[rnd(0.075, 0.095), 900, 0.34 * size], [rnd(0.17, 0.21), 550, 0.18 * size]]) {
+    // dry = no echo (loud bangs inside the rattle, where an echo would smear it).
+    if (!dry) for (const [delay, lp, g] of [[rnd(0.075, 0.095), 900, 0.34 * size], [rnd(0.17, 0.21), 550, 0.18 * size]]) {
         const dl = ctx.createDelay(1); dl.delayTime.value = delay;
         const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp;
         const gn = ctx.createGain(); gn.gain.value = g;
@@ -449,7 +450,7 @@ function gunshot(volume, muffle, at, prof, size, tone) {
     }
     const dark = ctx.createBiquadFilter();
     dark.type = 'lowpass'; dark.frequency.value = 600;
-    const wet = ctx.createGain(); wet.gain.value = 0.22 * size;
+    const wet = ctx.createGain(); wet.gain.value = dry ? 0 : 0.22 * size;
     vol.connect(dark); dark.connect(wet); wet.connect(reverbs.short);
 
     // Crack: wide noise, driven into hard clipping, low-passed after so it snaps without hiss.
@@ -490,11 +491,13 @@ const DEFAULT_PROFILE = { pitch: 1, length: 1, crack: 1 };
 //   hits = [min, max] micro-hits per shot, first = level of the opening hit,
 //   accent = chance any micro-hit is a loud bang (x ACCENT_LEVEL, with its own thump)
 const RATTLE = {
-    pop:  { hits: [3, 5], first: 1.0,  body: 1.00, thump: 0.10, accent: 0.08 },
-    bang: { hits: [5, 8], first: 1.45, body: 1.25, thump: 0.20, accent: 0.18 },
+    pop:  { hits: [3, 5], first: 1.0,  body: 1.00, thump: 0.10, accent: 0.04 },
+    bang: { hits: [5, 8], first: 1.45, body: 1.25, thump: 0.20, accent: 0.09 },
 };
-const RATTLE_GAIN = 1.8;   // overall rattle loudness (about +5dB)
-const ACCENT_LEVEL = 2.0;  // loud bangs inside the rattle
+const RATTLE_GAIN = 0.75;  // rattle level. The NUI audio has a hard ceiling, so this leaves headroom for
+                           // the loud bangs to jump out (~12dB). Raise it for a louder but flatter rattle.
+const ACCENT_LEVEL = 3.6;  // loud bangs inside the rattle
+const ACCENT_SHOT = 1.4;   // gunshot layered on each loud bang
 
 function microHit(t, lvl, prof, out) {
     const P = prof.pitch, L = prof.length;
@@ -539,6 +542,8 @@ function rattle(kind, volume, muffle, t, prof) {
             const ag = envGain(at, k.thump * 1.2, 0.05 * prof.length);
             a.connect(ag); ag.connect(out);
             a.start(at); a.stop(at + 0.07 * prof.length);
+            // A small gunshot on top: the crack + slapback is what makes it read as a loud bang.
+            gunshot(volume * ACCENT_SHOT, muffle, at, prof, 0.55, 230, true);
         }
         // 13-35ms apart, most around 20ms.
         at += (13 + Math.pow(Math.random(), 1.6) * 22) / 1000;

@@ -13,3 +13,13 @@ V5.2.1
   at 2x level with a thump under them.
 - More bangs: overrun crackle BangChance 0.30 -> 0.40, MegaChance 0.15 -> 0.18; 2-step mix
   shifted towards bang/mega at every intensity.
+
+V5.2.2
+- BIG bangs fire 3 times back to back like gunshots (Config.BigBang.Count / GapMs). Applies
+  everywhere a BIG bang fires: crackle finale, lift-off and gear change bursts, Maximum 2-step.
+- Loud bangs inside the rattle are much louder (~12dB above the rattle instead of ~7dB): each
+  is a hit at 3.6x plus a dry gunshot crack (ACCENT_LEVEL / ACCENT_SHOT in html/index.html).
+  They are rarer so they stay a few big hits (4% of pop micro-hits, 9% of bang micro-hits).
+- To make room for them the everyday rattle sits ~3dB lower (RATTLE_GAIN 1.8 -> 0.75): the
+  NUI audio has a hard ceiling and the rattle was already pinned against it. Raise
+  RATTLE_GAIN for a louder but flatter rattle, or turn up Config.SoundVolume / game volume.

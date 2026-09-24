@@ -43,6 +43,8 @@ Config.BigBang = {
     CrackleFinale = true,    -- end every overrun crackle with a BIG bang
     FinaleDelayMs = 150,     -- pause after the last crackle before the BIG bang
     CrackleChance = 0.04,    -- chance any crackle shot is a BIG bang
+    Count = 3,               -- each BIG bang fires this many times back to back, like gunshots
+    GapMs = { 110, 170 },    -- gap between them (keep >= 75ms so everyone nearby hears each one)
     Shake = 0.025,           -- camera shake for players close by (0 = off, 0.1 = heavy)
     ShakeRange = 12.0,       -- metres
 }

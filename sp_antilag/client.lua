@@ -324,12 +324,26 @@ end)
 
 local testing=nil -- { vehicle, draft } while the panel's test mode runs
 
-local function send(vehicle,kind,withFlame,look,sizeMul)
-    if withFlame==nil then withFlame=true end
-    look=look or lookOf(settingsOf(vehicle) or {})
+local function sendOne(vehicle,kind,withFlame,look,sizeMul)
     playSound(vehicle,kind,look)
     if withFlame then flame(vehicle,flameLevel(kind),look,nil,sizeMul) end
     TriggerServerEvent('sp_antilag:effect',VehToNet(vehicle),plateOf(vehicle),kind,withFlame,look)
+end
+
+-- A BIG bang is fired Config.BigBang.Count times back to back, like gunshots.
+local function send(vehicle,kind,withFlame,look,sizeMul)
+    if withFlame==nil then withFlame=true end
+    look=look or lookOf(settingsOf(vehicle) or {})
+    local count=kind=='big' and (Config.BigBang.Count or 1) or 1
+    if count<=1 then return sendOne(vehicle,kind,withFlame,look,sizeMul) end
+    CreateThread(function()
+        local gap=Config.BigBang.GapMs or {110,170}
+        for i=1,count do
+            if not DoesEntityExist(vehicle) then return end
+            sendOne(vehicle,kind,withFlame,look,sizeMul)
+            if i<count then Wait(math.random(gap[1],gap[2])) end
+        end
+    end)
 end
 
 -- Bursts follow a sequence of { kind, gap-after-ms }.
