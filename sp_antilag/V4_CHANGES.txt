@@ -1,0 +1,25 @@
+V4 EFFECTS REBUILD
+
+Kept:
+- mechanic-only in-car install
+- ox_inventory item use
+- per-plate oxmysql persistence
+- /removeantilag while testing
+
+Rebuilt:
+- no random burst selection
+- no RPM requirement
+- held-throttle limiter cadence
+- one controlled lift-off burst per throttle release
+- new clean 16-bit PCM audio bank made from full natural backfire events
+- no playback-rate randomisation
+- exhaust bone world-position flames
+- forced twin-rear fallback for addon cars
+- larger flame scale
+- install.sql included
+
+Stationary:
+hold throttle hard for 300ms -> controlled six-hit limiter burst
+
+Driving:
+accelerate, then snap fully off throttle -> controlled three-hit overrun burst

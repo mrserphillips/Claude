@@ -1,0 +1,250 @@
+local installedCache = {}
+local lastThrottle = 0.0
+local lastRpm = 0.0
+local lastBurst = 0
+local confirmedPlate = nil
+local rpmPeaks = {}
+
+local function cleanPlate(p)
+    return (p or ''):gsub('^%s*(.-)%s*$', '%1'):upper()
+end
+
+local function plateOf(vehicle)
+    return cleanPlate(GetVehicleNumberPlateText(vehicle))
+end
+
+local function isMechanic()
+    local data = exports.qbx_core:GetPlayerData()
+    return data and data.job and Config.MechanicJobs[data.job.name] == true
+end
+
+local function currentInstallVehicle()
+    local ped = PlayerPedId()
+    if not IsPedInAnyVehicle(ped, false) then return 0, 'You must be inside the vehicle to install anti-lag.' end
+    local vehicle = GetVehiclePedIsIn(ped, false)
+    if vehicle == 0 or not DoesEntityExist(vehicle) then return 0, 'Could not detect the vehicle.' end
+    if GetPedInVehicleSeat(vehicle, -1) ~= ped then return 0, 'You must be sitting in the driver seat to install anti-lag.' end
+    return vehicle
+end
+
+local function installed(vehicle)
+    local plate = plateOf(vehicle)
+    if plate == '' then return false end
+    if installedCache[plate] ~= nil then return installedCache[plate] end
+    local result = lib.callback.await('sp_antilag:isInstalled', false, plate)
+    installedCache[plate] = result == true
+    return installedCache[plate]
+end
+
+exports('useAntiLagKit', function()
+    if not isMechanic() then return lib.notify({type='error', description='Only a mechanic can fit anti-lag.'}) end
+    local vehicle, reason = currentInstallVehicle()
+    if vehicle == 0 then return lib.notify({type='error', description=reason}) end
+    local plate = plateOf(vehicle)
+    if plate == '' then return lib.notify({type='error', description='Could not read this vehicle plate.'}) end
+    if installed(vehicle) then return lib.notify({type='error', description='This vehicle already has anti-lag fitted.'}) end
+    TriggerServerEvent('sp_antilag:requestInstall', plate)
+end)
+
+RegisterNetEvent('sp_antilag:beginInstall', function(expectedPlate)
+    local vehicle, reason = currentInstallVehicle()
+    if vehicle == 0 then return lib.notify({type='error', description=reason}) end
+    if plateOf(vehicle) ~= expectedPlate then return lib.notify({type='error', description='Vehicle changed. Installation cancelled.'}) end
+
+    local ok = lib.progressBar({
+        duration=Config.InstallTime,
+        label='Fitting anti-lag system...',
+        canCancel=true,
+        disable={car=true, move=true, combat=true}
+    })
+    if ok then TriggerServerEvent('sp_antilag:finishInstall', VehToNet(vehicle), expectedPlate) end
+end)
+
+
+RegisterCommand('removeantilag', function()
+    if not isMechanic() then
+        return lib.notify({type='error', description='Only a mechanic can remove anti-lag.'})
+    end
+
+    local vehicle, reason = currentInstallVehicle()
+    if vehicle == 0 then
+        return lib.notify({type='error', description=reason})
+    end
+
+    local plate = plateOf(vehicle)
+    if plate == '' then
+        return lib.notify({type='error', description='Could not read this vehicle plate.'})
+    end
+
+    if not installed(vehicle) then
+        return lib.notify({type='error', description='This vehicle does not have anti-lag fitted.'})
+    end
+
+    local ok = lib.progressBar({
+        duration=10000,
+        label='Removing anti-lag system...',
+        canCancel=true,
+        disable={car=true, move=true,combat=true}
+    })
+
+    if ok then
+        TriggerServerEvent('sp_antilag:remove', VehToNet(vehicle), plate)
+    end
+end, false)
+
+RegisterNetEvent('sp_antilag:setInstalled', function(plate, state)
+    installedCache[cleanPlate(plate)] = state == true
+end)
+
+local exhaustNames={'exhaust','exhaust_2','exhaust_3','exhaust_4','exhaust_5','exhaust_6','exhaust_7','exhaust_8','exhaust_9','exhaust_10','exhaust_11','exhaust_12','exhaust_13','exhaust_14','exhaust_15','exhaust_16'}
+
+local function loadPtfx()
+    if HasNamedPtfxAssetLoaded('core') then return true end
+    RequestNamedPtfxAsset('core')
+    local untilTime=GetGameTimer()+2500
+    while not HasNamedPtfxAssetLoaded('core') and GetGameTimer()<untilTime do Wait(0) end
+    return HasNamedPtfxAssetLoaded('core')
+end
+
+local function nativeSound(vehicle,kind)
+    local s=Config.NativeSounds[kind] or Config.NativeSounds.pop
+    -- The sound belongs to the vehicle entity rather than the NUI/browser.
+    PlaySoundFromEntity(-1,s.name,vehicle,s.set,true,0)
+end
+
+local function fireBone(vehicle,bone,scale)
+    local p=GetWorldPositionOfEntityBone(vehicle,bone)
+    UseParticleFxAssetNextCall('core')
+    StartParticleFxNonLoopedAtCoord(
+        'veh_backfire',
+        p.x,p.y,p.z,
+        0.0,0.0,GetEntityHeading(vehicle),
+        scale,
+        false,false,false
+    )
+end
+
+local function fireFallback(vehicle,scale)
+    local minDim,maxDim=GetModelDimensions(GetEntityModel(vehicle))
+    local width=(maxDim.x-minDim.x)*0.26
+    local rear=minDim.y-0.10
+    local z=minDim.z+(maxDim.z-minDim.z)*0.34
+    for _,x in ipairs({-width,width}) do
+        local p=GetOffsetFromEntityInWorldCoords(vehicle,x,rear,z)
+        UseParticleFxAssetNextCall('core')
+        StartParticleFxNonLoopedAtCoord(
+            'veh_backfire',p.x,p.y,p.z,
+            0.0,0.0,GetEntityHeading(vehicle),
+            scale,false,false,false
+        )
+    end
+end
+
+local lastFlameByVehicle={}
+local function flame(vehicle,big)
+    if not DoesEntityExist(vehicle) then return end
+
+    -- Hard local safety gate: no vehicle can create visual PTFX faster than this.
+    -- This is deliberately client-side and silent.
+    local now=GetGameTimer()
+    local key=VehToNet(vehicle)
+    if key==0 then key=vehicle end
+    if lastFlameByVehicle[key] and (now-lastFlameByVehicle[key]) < 70 then return end
+    lastFlameByVehicle[key]=now
+
+    if not loadPtfx() then return end
+    local scale=big and Config.BigFlameScale or Config.FlameScale
+    local found=0
+    for _,name in ipairs(exhaustNames) do
+        if found>=4 then break end
+        local bone=GetEntityBoneIndexByName(vehicle,name)
+        if bone~=-1 then
+            fireBone(vehicle,bone,scale)
+            found=found+1
+        end
+    end
+    if found==0 then fireFallback(vehicle,scale) end
+end
+
+RegisterNetEvent('sp_antilag:effect',function(netId,kind,sourceServerId)
+    if sourceServerId==GetPlayerServerId(PlayerId()) then return end
+    local vehicle=NetToVeh(netId)
+    if vehicle==0 or not DoesEntityExist(vehicle) then return end
+    if #(GetEntityCoords(PlayerPedId())-GetEntityCoords(vehicle))>Config.Range then return end
+    nativeSound(vehicle,kind)
+    flame(vehicle,kind~='pop')
+end)
+
+local function send(vehicle,kind)
+    nativeSound(vehicle,kind)
+    flame(vehicle,kind~='pop')
+    TriggerServerEvent('sp_antilag:effect',VehToNet(vehicle),plateOf(vehicle),kind)
+end
+
+local function limiterBurst(vehicle)
+    -- Crackle builds into ONE proper bang instead of every hit sounding the same.
+    send(vehicle,'pop'); Wait(82)
+    send(vehicle,'pop'); Wait(88)
+    send(vehicle,'pop'); Wait(96)
+    send(vehicle,'bang')
+end
+
+local function liftBurst(vehicle)
+    -- Short overrun crackle, then a single hard bang.
+    send(vehicle,'pop'); Wait(95)
+    send(vehicle,'pop'); Wait(120)
+    send(vehicle,'mega')
+end
+
+local lastThrottle=0.0
+local limiterSince=nil
+local lastLimiter=0
+local lastLift=0
+local activePlate=nil
+
+CreateThread(function()
+    while true do
+        local sleep=350
+        local ped=PlayerPedId()
+        if IsPedInAnyVehicle(ped,false) then
+            local vehicle=GetVehiclePedIsIn(ped,false)
+            if vehicle~=0 and GetPedInVehicleSeat(vehicle,-1)==ped and installed(vehicle) then
+                sleep=20
+                local plate=plateOf(vehicle)
+                if activePlate~=plate then
+                    activePlate=plate
+                    lib.notify({type='success',description='Anti-lag active on '..plate})
+                end
+
+                local throttle=GetControlNormal(0,71)
+                local speed=GetEntitySpeed(vehicle)*3.6
+                local now=GetGameTimer()
+
+                if speed<12.0 and throttle>=Config.LimiterThrottle then
+                    limiterSince=limiterSince or now
+                    if now-limiterSince>=Config.LimiterHoldMs and now-lastLimiter>=Config.LimiterCooldownMs then
+                        lastLimiter=now
+                        CreateThread(function() limiterBurst(vehicle) end)
+                    end
+                else
+                    limiterSince=nil
+                end
+
+                if speed>=Config.MinSpeedKmh
+                and lastThrottle>=Config.LiftThrottleBefore
+                and throttle<=Config.LiftThrottleAfter
+                and now-lastLift>=Config.LiftCooldownMs then
+                    lastLift=now
+                    CreateThread(function() liftBurst(vehicle) end)
+                end
+
+                lastThrottle=throttle
+            else
+                limiterSince=nil; lastThrottle=0.0; activePlate=nil
+            end
+        else
+            limiterSince=nil; lastThrottle=0.0; activePlate=nil
+        end
+        Wait(sleep)
+    end
+end)

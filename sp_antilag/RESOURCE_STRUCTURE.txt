@@ -1,0 +1,11 @@
+The folder named sp_antilag is the resource folder itself.
+fxmanifest.lua MUST sit directly inside this folder.
+
+Correct:
+resources/sp_antilag/fxmanifest.lua
+
+Incorrect:
+resources/sp_antilag/sp_antilag/fxmanifest.lua
+
+Start with:
+ensure sp_antilag

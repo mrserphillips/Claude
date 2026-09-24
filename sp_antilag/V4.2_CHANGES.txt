@@ -1,0 +1,13 @@
+V4.2 SAFE LOCAL FX
+- V4.1 networked PTFX removed completely.
+- Flames are LOCAL client-side particles only.
+- Server still syncs the tiny anti-lag effect event so nearby clients can render locally.
+- Hard 70ms per-vehicle local flame safety gate.
+- Maximum 4 detected exhaust bones per vehicle.
+- Server effect rate gate raised to 70ms.
+- No debug prints / console spam added.
+- Native positional sound retained.
+- Install, DB persistence, removal and install.sql retained.
+
+This specifically addresses the V4.1 crash:
+NETWORK_PTFX_EVENT pool exhaustion.

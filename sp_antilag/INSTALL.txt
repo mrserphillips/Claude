@@ -1,0 +1,53 @@
+SP ANTI-LAG V3
+
+Original implementation inspired by the behaviour demonstrated by modern FiveM 2-step systems:
+reactive rapid backfire bursts, heavy bangs, synced flames/sounds and per-plate persistence.
+
+INSTALLATION
+Mechanic sits in DRIVER SEAT and uses antilag_kit from ox_inventory.
+
+ITEM:
+['antilag_kit'] = {
+    label = 'Anti-Lag Kit',
+    weight = 2500,
+    stack = true,
+    close = true,
+    description = 'A mechanic-installed anti-lag ECU/exhaust kit.',
+    client = { export = 'sp_antilag.useAntiLagKit' }
+},
+
+No driver toggle. Once fitted it is automatic.
+
+V3 behaviour:
+- Throttle lift at useful RPM = irregular rapid backfire burst.
+- Holding throttle at limiter = aggressive rapid-fire burst.
+- Real crack/bang samples rather than generated tiny pop sounds.
+- Heavy and mega bangs mixed into bursts rather than a fixed scripted sequence.
+- Flame attempt on every shot; heavy shots get larger flames.
+- Standard exhaust bones plus addon-car rear fallback.
+- Nearby clients hear/see synced events.
+- Plate persistence via oxmysql.
+- Server verifies the actual network entity/plate before install and effect broadcast.
+
+Set Config.MechanicJobs to your actual internal mechanic job names.
+
+
+V3.2 IMPORTANT CHANGE
+The runtime no longer uses vehicle RPM as an activation requirement.
+This is intentional: many addon/import vehicles expose RPM values that do not
+match vanilla GTA vehicles.
+
+TEST:
+- Enter a fitted vehicle as driver. You should see "Anti-lag active on PLATE".
+- Stationary: hold accelerator. It will repeatedly burst while the car is slow.
+- Driving: accelerate, then fully release throttle. It will burst on lift-off.
+
+V3.2.1 DATABASE FIX
+Compatible with the existing sp_antilag table that only contains the plate column.
+No manual SQL migration is required.
+
+V3.3 REMOVAL
+Mechanic sits in the DRIVER SEAT of a fitted vehicle and uses:
+/removeantilag
+A 10-second removal runs, then the plate is deleted from the database immediately.
+The original kit is NOT returned.

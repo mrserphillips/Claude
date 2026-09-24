@@ -1,0 +1,10 @@
+V4.3 BANG PASS
+- The previous 'bang' used the exact same BOOT_POP sound as the crackle, so it could never sound like a bang.
+- Bang now uses GTA's Explosion_01 from FBI_HEIST_ELEVATOR_SHAFT_DEBRIS_SOUNDS.
+- Mega uses Explosion_04 from the same soundset.
+- Limiter cadence is 3 crackles -> 1 bang.
+- Lift cadence is 2 crackles -> 1 harder bang.
+- No NUI/WAV recording audio.
+- No networked PTFX.
+- No debug console prints.
+- Existing install/database/removal system retained.

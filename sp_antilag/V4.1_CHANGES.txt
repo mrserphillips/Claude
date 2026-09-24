@@ -1,0 +1,12 @@
+V4.1 NATIVE EFFECTS TEST
+- Removed NUI/browser WAV playback completely.
+- Pops/bangs are now GTA native positional sounds emitted from the vehicle entity.
+- No prerecorded multi-pop audio sequence.
+- Flames use networked veh_backfire directly on exhaust bones.
+- Addon fallback remains if the vehicle exposes no exhaust bones.
+- Install, persistence and removal from V4 are retained.
+- install.sql retained.
+
+IMPORTANT:
+This build intentionally uses existing GTA soundsets rather than pretending a custom AWC exists.
+A genuinely custom native wavepack requires authored .awc + .dat54.rel metadata; those binaries are not fabricated here.

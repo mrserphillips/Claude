@@ -1,0 +1,11 @@
+V4.2.1
+Fixes the F8 error:
+attempt to call a nil value (global 'StartParticleFxNonLoopedOnEntityBone')
+
+The invalid Lua native call has been removed.
+Exhaust bone world coordinates are now resolved first, then the valid local
+StartParticleFxNonLoopedAtCoord native renders veh_backfire at that point.
+
+Particles remain NON-NETWORKED, so the V4.1 NETWORK_PTFX_EVENT pool crash
+cannot be reintroduced by this fix.
+No debug prints were added.
