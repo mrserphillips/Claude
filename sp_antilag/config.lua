@@ -20,7 +20,8 @@ Config.SoundRange = 120.0  -- metres; beyond this nearby players hear nothing
 Config.NativeSounds = {
     pop  = { name = 'BOOT_POP', set = 'DLC_VW_BODY_DISPOSAL_SOUNDS' },
     bang = { name = 'Explosion_01', set = 'FBI_HEIST_ELEVATOR_SHAFT_DEBRIS_SOUNDS' },
-    mega = { name = 'Explosion_04', set = 'FBI_HEIST_ELEVATOR_SHAFT_DEBRIS_SOUNDS' }
+    mega = { name = 'Explosion_04', set = 'FBI_HEIST_ELEVATOR_SHAFT_DEBRIS_SOUNDS' },
+    big  = { name = 'Explosion_04', set = 'FBI_HEIST_ELEVATOR_SHAFT_DEBRIS_SOUNDS' }
 }
 
 -- V4 uses driver input instead of addon-dependent RPM values.
@@ -31,14 +32,24 @@ Config.LiftThrottleBefore = 0.55
 Config.LiftThrottleAfter = 0.08
 Config.LiftCooldownMs = 520
 
--- Burst patterns: { kind, gap after this shot in ms }. kind = 'pop' | 'bang' | 'mega'.
+-- Burst patterns: { kind, gap after this shot in ms }. kind = 'pop' | 'bang' | 'mega' | 'big'.
 -- Keep gaps >= 75ms so nearby players receive every shot (server rate gate is 70ms).
 Config.LimiterSequence = {      -- held throttle, stationary
-    { 'pop', 85 }, { 'bang', 110 }, { 'pop', 85 }, { 'mega', 0 }
+    { 'pop', 85 }, { 'bang', 110 }, { 'pop', 85 }, { 'mega', 220 }, { 'big', 0 }
 }
 Config.LiftSequence = {         -- lift off at speed
-    { 'bang', 100 }, { 'pop', 90 }, { 'mega', 0 }
+    { 'bang', 100 }, { 'pop', 90 }, { 'mega', 240 }, { 'big', 0 }
 }
+
+-- BIG bangs: a separate, much heavier explosion that lands after the crackle.
+Config.BigBang = {
+    CrackleFinale = true,    -- end every overrun crackle with a BIG bang
+    FinaleDelayMs = 150,     -- pause after the last crackle before the BIG bang
+    CrackleChance = 0.04,    -- chance any crackle shot is a BIG bang
+    Shake = 0.12,            -- camera shake for players close by (0 = off)
+    ShakeRange = 20.0,       -- metres
+}
+Config.HugeFlameScale = 3.0  -- flame size for BIG bangs
 
 Config.FlameScale = 1.55
 Config.BigFlameScale = 2.15
@@ -54,7 +65,7 @@ Config.PopsBangs = {
     DefaultOn = true,        -- state for newly fitted vehicles
     MinSpeedKmh = 25.0,      -- only crackle above this speed
     MaxThrottle = 0.08,      -- counts as "off throttle" at or below this
-    StartDelayMs = 350,      -- wait after lift-off before the crackle starts (lets the lift burst play)
+    StartDelayMs = 800,      -- wait after lift-off before the crackle starts (lets the lift burst + BIG bang play)
     MaxDurationMs = 4500,    -- stop crackling after this long on the overrun
     MinGapMs = 90,           -- shortest gap between pops (server rate gate is 70ms)
     MaxGapMs = 260,          -- longest gap between pops

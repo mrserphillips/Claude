@@ -190,6 +190,12 @@ end
 
 local function playSound(vehicle,kind)
     if Config.SoundMode=='native' then nativeSound(vehicle,kind) else synthSound(vehicle,kind) end
+    if kind=='big' and Config.BigBang.Shake>0 then
+        local dist=#(GetEntityCoords(PlayerPedId())-GetEntityCoords(vehicle))
+        if dist<Config.BigBang.ShakeRange then
+            ShakeGameplayCam('SMALL_EXPLOSION_SHAKE',Config.BigBang.Shake*(1.0-dist/Config.BigBang.ShakeRange))
+        end
+    end
 end
 
 local STOCK_GLOW={1.0,0.47,0.08}
@@ -230,11 +236,12 @@ end
 local function glow(points,r,g,b,big)
     if not Config.FlameGlow then return end
     if not r then r,g,b=STOCK_GLOW[1],STOCK_GLOW[2],STOCK_GLOW[3] end
-    local range=big and Config.FlameGlowRange*1.4 or Config.FlameGlowRange
-    local intensity=big and Config.FlameGlowIntensity*1.5 or Config.FlameGlowIntensity
+    local huge=big=='huge'
+    local range=Config.FlameGlowRange*(huge and 2.2 or big and 1.4 or 1.0)
+    local intensity=Config.FlameGlowIntensity*(huge and 2.5 or big and 1.5 or 1.0)
     local R,G,B=math.floor(r*255),math.floor(g*255),math.floor(b*255)
     CreateThread(function()
-        local untilTime=GetGameTimer()+(big and 160 or 100)
+        local untilTime=GetGameTimer()+(huge and 280 or big and 160 or 100)
         while GetGameTimer()<untilTime do
             for _,p in ipairs(points) do DrawLightWithRange(p.x,p.y,p.z,R,G,B,range,intensity) end
             Wait(0)
@@ -253,6 +260,11 @@ local function fallbackPoints(vehicle)
     }
 end
 
+local function flameLevel(kind)
+    if kind=='big' then return 'huge' end
+    return kind~='pop'
+end
+
 local lastFlameByVehicle={}
 local function flame(vehicle,big,colour,fx)
     if not DoesEntityExist(vehicle) then return end
@@ -266,7 +278,7 @@ local function flame(vehicle,big,colour,fx)
     lastFlameByVehicle[key]=now
 
     if not loadPtfx() then return end
-    local scale=big and Config.BigFlameScale or Config.FlameScale
+    local scale=(big=='huge' and Config.HugeFlameScale) or (big and Config.BigFlameScale) or Config.FlameScale
     local r,g,b=resolveColour(colour)
     local heading=GetEntityHeading(vehicle)
     local points={}
@@ -286,14 +298,14 @@ RegisterNetEvent('sp_antilag:effect',function(netId,kind,sourceServerId,colour,w
     if vehicle==0 or not DoesEntityExist(vehicle) then return end
     if #(GetEntityCoords(PlayerPedId())-GetEntityCoords(vehicle))>Config.Range then return end
     playSound(vehicle,kind)
-    if withFlame~=false then flame(vehicle,kind~='pop',colour) end
+    if withFlame~=false then flame(vehicle,flameLevel(kind),colour) end
 end)
 
 local function send(vehicle,kind,withFlame)
     if withFlame==nil then withFlame=true end
     local settings=settingsOf(vehicle)
     playSound(vehicle,kind)
-    if withFlame then flame(vehicle,kind~='pop',settings and settings.colour) end
+    if withFlame then flame(vehicle,flameLevel(kind),settings and settings.colour) end
     TriggerServerEvent('sp_antilag:effect',VehToNet(vehicle),plateOf(vehicle),kind,withFlame)
 end
 
@@ -312,7 +324,9 @@ local function liftBurst(vehicle) burst(vehicle,Config.LiftSequence) end
 local function crackleShot(vehicle)
     local pb=Config.PopsBangs
     local roll=math.random()
-    if roll<pb.MegaChance then
+    if roll<Config.BigBang.CrackleChance then
+        send(vehicle,'big',true)
+    elseif roll<Config.BigBang.CrackleChance+pb.MegaChance then
         send(vehicle,'mega',true)
     elseif roll<pb.MegaChance+pb.BangChance then
         send(vehicle,'bang',true)
@@ -327,6 +341,7 @@ local lastLimiter=0
 local lastLift=0
 local activePlate=nil
 local overrunSince=nil
+local finaleDone=false
 local nextCrackle=0
 
 local function resetState()
@@ -378,10 +393,16 @@ CreateThread(function()
                     if not overrunSince and lastThrottle>pb.MaxThrottle then
                         overrunSince=now
                         nextCrackle=now+pb.StartDelayMs
+                        finaleDone=false
                     end
                     if overrunSince and now-overrunSince<=pb.MaxDurationMs and now>=nextCrackle then
                         nextCrackle=now+math.random(pb.MinGapMs,pb.MaxGapMs)
                         crackleShot(vehicle)
+                    elseif overrunSince and not finaleDone and Config.BigBang.CrackleFinale
+                    and now-overrunSince>pb.MaxDurationMs and now>=nextCrackle+Config.BigBang.FinaleDelayMs then
+                        -- Crackle has run its course: finish it with one BIG bang.
+                        finaleDone=true
+                        send(vehicle,'big',true)
                     end
                 else
                     overrunSince=nil
@@ -474,16 +495,16 @@ end
 
 RegisterCommand(Config.MenuCommand,function() openMenu() end,false)
 
--- /antilagtest: plays pop, pop, bang, pop, mega locally so you can check the sound works.
+-- /antilagtest: plays pop, pop, bang, pop, mega, BIG locally so you can check the sound works.
 RegisterCommand('antilagtest',function()
     local ped=PlayerPedId()
     local vehicle=GetVehiclePedIsIn(ped,false)
     local target=vehicle~=0 and vehicle or ped
     CreateThread(function()
-        for _,kind in ipairs({'pop','pop','bang','pop','mega'}) do
+        for _,kind in ipairs({'pop','pop','bang','pop','mega','big'}) do
             playSound(target,kind)
-            if vehicle~=0 then flame(vehicle,kind~='pop',(settingsOf(vehicle) or {}).colour) end
-            Wait(kind=='pop' and 110 or 450)
+            if vehicle~=0 then flame(vehicle,flameLevel(kind),(settingsOf(vehicle) or {}).colour) end
+            Wait(kind=='pop' and 110 or kind=='big' and 1200 or 450)
         end
     end)
 end,false)

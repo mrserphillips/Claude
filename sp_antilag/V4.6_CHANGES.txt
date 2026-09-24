@@ -1,0 +1,13 @@
+V4.6 BIG BANGS
+- New shot type 'big': a separate, much heavier explosion. Pops, bangs and megas are unchanged.
+  BIG = long hard crack + two detuned overdriven tones dropping 110->28Hz + a sub drop
+  + low (420Hz) rumble + a double echo down the street. Deep boom, no hiss.
+- BIG flames: Config.HugeFlameScale (3.0) and a bigger, longer glow.
+- Camera shake for players close to a BIG bang (Config.BigBang.Shake / ShakeRange).
+- Where BIG bangs happen (all in Config.BigBang / the sequences):
+    * end of the limiter burst:  pop, bang, pop, mega ... BIG
+    * end of the lift-off burst: bang, pop, mega ... BIG
+    * end of every overrun crackle (CrackleFinale)
+    * occasionally mid-crackle (CrackleChance 0.04)
+- Crackle now starts 800ms after lift-off (was 350ms) so the lift burst's BIG bang is heard clean.
+- /antilagtest now ends with a BIG bang.

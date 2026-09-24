@@ -172,7 +172,7 @@ end)
 local rate={}
 RegisterNetEvent('sp_antilag:effect', function(netId, clientPlate, kind, withFlame)
     local src=source
-    if kind~='pop' and kind~='bang' and kind~='mega' then return end
+    if kind~='pop' and kind~='bang' and kind~='mega' and kind~='big' then return end
     local now=os.clock()
     if rate[src] and now-rate[src] < 0.07 then return end
     rate[src]=now
