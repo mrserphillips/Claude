@@ -6,9 +6,213 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Exo+2:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-<link rel="stylesheet" href="style.css">
+<style>
+:root {
+    --accent: #2F8CFF;
+    --accent-glow: #5FB0FF;
+    --accent-soft: rgba(47, 140, 255, 0.14);
+    --accent-line: rgba(47, 140, 255, 0.35);
+    --danger: #FF5C57;
+    --bg: rgba(8, 12, 20, 0.90);
+    --card: rgba(0, 0, 0, 0.42);
+    --line: rgba(255, 255, 255, 0.10);
+    --text: #E8EEF7;
+    --muted: #8A96A8;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; }
+body { font-family: 'Exo 2', sans-serif; color: var(--text); user-select: none; }
+.hidden { display: none !important; }
+button { font-family: inherit; cursor: pointer; }
+kbd {
+    display: inline-block; padding: 3px 8px; border-radius: 5px; background: #1A2130;
+    border: 1px solid #2C3648; font: 700 10px 'Orbitron', sans-serif; color: #fff;
+}
+
+/* ---------- panel ---------- */
+.panel {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(1240px, 94vw); height: min(720px, 90vh);
+    display: flex; flex-direction: column; padding: 22px 26px;
+    background: var(--bg); border: 1px solid var(--accent-line); border-radius: 6px;
+    box-shadow: 0 0 40px rgba(47, 140, 255, 0.18), inset 0 0 60px rgba(47, 140, 255, 0.05);
+    transition: transform .25s ease, opacity .2s;
+}
+.panel.placed { transform: none; }
+.panel.testing { transform: scale(0.6); transform-origin: top right; opacity: .92; }
+
+.panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 18px; border-bottom: 1px solid var(--accent-line); cursor: move;
+}
+.title { display: flex; align-items: center; gap: 16px; font: 800 24px 'Orbitron', sans-serif; letter-spacing: 1.5px; }
+.title i { color: var(--accent); font-size: 22px; filter: drop-shadow(0 0 6px var(--accent)); }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.icon-btn {
+    width: 28px; height: 28px; border-radius: 5px; border: none; color: #fff;
+    background: var(--accent); font-size: 13px;
+}
+.close-dot { width: 13px; height: 13px; border-radius: 3px; border: none; background: var(--danger); align-self: flex-start; }
+
+.tabs { display: flex; gap: 12px; margin: 20px 0; flex-wrap: wrap; }
+.tab {
+    padding: 10px 20px; border-radius: 4px; background: #1A1F28; border: 1px solid #2A313D;
+    color: #C9D1DD; font: 600 12px 'Orbitron', sans-serif; letter-spacing: 1px; display: flex; gap: 6px; align-items: center;
+}
+.tab:hover { border-color: var(--accent-line); }
+.tab.active { background: var(--accent); border-color: var(--accent); color: #031126; box-shadow: 0 0 14px rgba(47, 140, 255, .5); }
+.tab .lock { display: none; font-size: 10px; }
+.tab.locked { opacity: .35; pointer-events: none; background: transparent; }
+.tab.locked .lock { display: inline; }
+
+.body { flex: 1; overflow-y: auto; padding-right: 4px; }
+.body::-webkit-scrollbar { width: 5px; }
+.body::-webkit-scrollbar-thumb { background: var(--accent-line); border-radius: 3px; }
+.page { display: none; }
+.page.active { display: block; }
+
+.twostep-grid { display: grid; grid-template-columns: 220px 1fr; gap: 16px; align-items: start; }
+.info-card {
+    padding: 10px 10px; border: 1px solid var(--accent-line); background: rgba(47, 140, 255, .07); border-radius: 3px;
+    font-size: 14px; display: flex; flex-direction: column; gap: 3px;
+}
+.info-card div { display: flex; justify-content: space-between; }
+.info-card span { color: var(--muted); }
+.info-card b { font: 700 13px 'Orbitron', sans-serif; }
+
+.card { border: 1px solid var(--line); background: var(--card); border-radius: 3px; padding: 10px 12px 16px; }
+.card-title {
+    font: 700 13px 'Orbitron', sans-serif; letter-spacing: 1px; padding-bottom: 8px; margin-bottom: 12px;
+    border-bottom: 1px solid var(--line); display: flex; gap: 6px; align-items: center;
+}
+.sub-card { border: 1px solid var(--line); background: rgba(0, 0, 0, .25); border-radius: 4px; padding: 14px; margin-top: 14px; }
+.sub-head { display: flex; justify-content: space-between; align-items: center; }
+.sub-actions { display: flex; gap: 14px; align-items: center; }
+.colour-name { font: 700 12px 'Orbitron', sans-serif; color: var(--accent); letter-spacing: 1px; }
+
+.label { font: 700 15px 'Orbitron', sans-serif; margin: 14px 0 8px; display: flex; gap: 8px; align-items: center; }
+.label i { color: var(--accent); }
+.label .value { margin-left: auto; color: var(--accent); font-size: 13px; }
+.hint { font-size: 12px; color: var(--muted); margin: 4px 0; }
+.hint.big { font-size: 13px; margin-bottom: 8px; }
+
+.row-toggle {
+    display: flex; align-items: center; gap: 10px; padding: 7px 0; cursor: pointer;
+    font: 600 15px 'Orbitron', sans-serif;
+}
+.row-toggle small { font: 400 12px 'Exo 2', sans-serif; color: var(--muted); }
+.row-toggle input { display: none; }
+.switch {
+    margin-left: auto; width: 48px; height: 22px; border-radius: 3px;
+    border: 1px solid var(--accent-line); background: rgba(0, 0, 0, .4); transition: .15s;
+}
+.row-toggle input:checked + .switch { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 12px rgba(47, 140, 255, .55); }
+
+.select-wrap { position: relative; }
+.select-wrap select {
+    width: 100%; appearance: none; padding: 12px 14px; border-radius: 4px; cursor: pointer;
+    background: rgba(0, 0, 0, .45); color: var(--text); border: 2px solid var(--accent-line);
+    font: 600 14px 'Orbitron', sans-serif; outline: none;
+}
+.select-wrap select:focus { border-color: var(--accent); }
+.select-wrap select option { background: #0D1320; }
+.select-wrap i { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.seg button {
+    padding: 10px; border-radius: 3px; background: rgba(0, 0, 0, .45); border: 1px solid var(--line);
+    color: #C9D1DD; font: 600 11px 'Orbitron', sans-serif; letter-spacing: 1px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.seg button i { font-size: 14px; }
+.seg button.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-glow); box-shadow: 0 0 12px rgba(47, 140, 255, .35); }
+
+.slider { width: 100%; appearance: none; height: 6px; border-radius: 3px; background: #1A2130; outline: none; }
+.slider::-webkit-slider-thumb {
+    appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 10px var(--accent); cursor: pointer;
+}
+
+.swatches { display: grid; grid-template-columns: repeat(15, 1fr); gap: 10px; margin-top: 12px; }
+.swatch {
+    aspect-ratio: 1; border-radius: 50%; background: #111; border: 2px solid #333A46;
+    display: flex; align-items: center; justify-content: center; position: relative;
+}
+.swatch::after { content: ''; width: 18%; height: 18%; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.swatch.rainbow::after { background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+.swatch:hover { border-color: var(--accent-line); }
+.swatch.active { border-color: var(--accent); box-shadow: 0 0 14px var(--accent), inset 0 0 8px rgba(47, 140, 255, .4); }
+
+.pill {
+    padding: 6px 14px; border-radius: 5px; background: #16191F; border: 1px solid #2E3440;
+    color: #C9D1DD; font: 600 11px 'Orbitron', sans-serif; letter-spacing: 1px; display: inline-flex; gap: 6px; align-items: center;
+}
+.pill i { color: var(--accent); }
+#testBtn { border-color: var(--accent-line); color: var(--accent); background: var(--accent-soft); }
+#testBtn.testing { border-color: var(--danger); color: var(--danger); background: rgba(255, 92, 87, .1); }
+#testBtn.testing i { color: var(--danger); }
+.toggle-pill.on { background: var(--accent); color: #031126; border-color: var(--accent); }
+.toggle-pill.on i { color: #031126; }
+
+.preset-row {
+    display: flex; align-items: center; padding: 12px 14px; margin-bottom: 10px; border-radius: 4px;
+    background: rgba(47, 140, 255, .16); border: 1px solid var(--accent-line);
+}
+.preset-row .name { font: 700 15px 'Orbitron', sans-serif; color: var(--accent-glow); width: 110px; }
+.preset-row .num { font: 700 15px 'Orbitron', sans-serif; flex: 1; text-align: center; }
+.preset-row .summary { flex: 2; font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.preset-row .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.preset-row .actions { display: flex; gap: 6px; }
+.preset-row .actions button {
+    padding: 5px 12px; border-radius: 4px; border: 1px solid var(--accent-line);
+    background: rgba(0, 0, 0, .3); color: var(--accent-glow); font-size: 12px;
+}
+.preset-row .actions button.clear { color: var(--danger); border-color: rgba(255, 92, 87, .4); }
+.divider { border-top: 1px solid var(--line); margin: 16px 0; }
+.btn-accent {
+    padding: 11px 18px; border-radius: 5px; border: none; background: var(--accent); color: #031126;
+    font: 600 14px 'Exo 2', sans-serif; display: inline-flex; gap: 8px; align-items: center;
+}
+
+.panel-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line); margin-top: 10px; }
+.panel-foot button { padding: 12px; border: none; border-radius: 3px; font: 600 15px 'Orbitron', sans-serif; }
+.btn-save { background: var(--accent); color: #031126; }
+.btn-save:hover { box-shadow: 0 0 16px var(--accent); }
+.btn-reset { background: var(--danger); color: #1C0303; }
+
+/* ---------- test prompt ---------- */
+.test-prompt {
+    position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%);
+    padding: 12px 22px; border-radius: 8px; background: var(--bg); border: 1px solid var(--accent-line);
+    display: flex; align-items: center; gap: 8px; font: 500 14px 'Exo 2', sans-serif;
+    box-shadow: 0 0 20px rgba(47, 140, 255, .2);
+}
+.test-prompt > i { color: var(--accent); }
+.test-prompt .sep { width: 1px; height: 18px; background: var(--line); margin: 0 6px; }
+
+/* ---------- hotbar ---------- */
+.hotbar {
+    position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%);
+    display: flex; gap: 10px; padding: 10px; border-radius: 8px;
+    background: var(--bg); border: 1px solid var(--accent-line); box-shadow: 0 0 20px rgba(47, 140, 255, .25);
+}
+.hotbar.placed { transform: none; }
+.hotbar.editing { cursor: move; outline: 2px dashed var(--accent); outline-offset: 4px; }
+.hb-slot {
+    width: 128px; padding: 10px; border-radius: 5px; border: 1px solid var(--line); background: rgba(0, 0, 0, .35);
+    display: flex; flex-direction: column; gap: 6px; transition: .15s;
+}
+.hb-slot .top { display: flex; justify-content: space-between; align-items: center; font: 700 12px 'Orbitron', sans-serif; }
+.hb-slot .key { padding: 2px 7px; border-radius: 4px; background: var(--accent); color: #031126; }
+.hb-slot .line { font-size: 11px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.hb-slot .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 5px var(--c); }
+.hb-slot.empty { opacity: .45; }
+.hb-slot.picked { border-color: var(--accent); box-shadow: 0 0 14px var(--accent); background: var(--accent-soft); }
+</style>
 </head>
 <body>
+<div id="ui" style="display:none">
 
 <div id="panel" class="panel hidden">
     <header class="panel-head" id="dragHandle">
@@ -134,7 +338,532 @@
 
 <div id="hotbar" class="hotbar hidden"></div>
 
-<script src="audio.js"></script>
-<script src="app.js"></script>
+</div>
+<script>
+// Synthesised exhaust pops / bangs. Nothing is prerecorded: every shot is built from
+// noise + a sub "thump" with slight randomisation so no two hits sound identical.
+let ctx = null, master = null, noise = null, shaper = null, hardShaper = null;
+const reverbs = {};
+
+function makeCurve(k) {
+    const n = 2048, curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curve[i] = Math.tanh(x * k); }
+    return curve;
+}
+
+// Decaying-noise impulse = the echo of a bang bouncing off the street.
+function makeReverb(seconds) {
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+        const d = buf.getChannelData(c);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    }
+    const conv = ctx.createConvolver();
+    conv.buffer = buf;
+    conv.connect(master);
+    return conv;
+}
+
+function init(existing) {
+    if (ctx) return;
+    ctx = existing || new (window.AudioContext || window.webkitAudioContext)();
+
+    // Limiter only: catches clipping but leaves bangs much louder than pops.
+    master = ctx.createDynamicsCompressor();
+    master.threshold.value = -2; master.knee.value = 0; master.ratio.value = 20;
+    master.attack.value = 0.001; master.release.value = 0.1;
+    // Soft clipper after the limiter so stacked bangs never hard-clip.
+    const clip = ctx.createWaveShaper();
+    const n = 2048, c = new Float32Array(n), norm = Math.tanh(1.5);
+    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = Math.tanh(x * 1.5) / norm * 0.98; }
+    clip.curve = c;
+    master.connect(clip); clip.connect(ctx.destination);
+
+    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = noise.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+    shaper = makeCurve(4);
+    hardShaper = makeCurve(12);
+    reverbs.short = makeReverb(0.7);
+    reverbs.long = makeReverb(1.4);
+}
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+// crack = sharp bright front edge, body = the main report, boom = low thump, echo = tail.
+const KINDS = {
+    pop:  { crack: [0.30, 0.010, 2500], body: ['bandpass', [900, 1900], 0.9, 0.07, 0.45, false],
+            boom: [140, 60, 0.06, 0.35], echo: null },
+    bang: { crack: [1.60, 0.028, 700],  body: ['lowpass', [2800, 3800], 0.8, 0.20, 1.30, true],
+            boom: [120, 42, 0.26, 1.00], echo: ['short', 0.35] },
+    mega: { crack: [2.20, 0.040, 500],  body: ['lowpass', [3000, 4200], 0.7, 0.34, 1.60, true],
+            boom: [100, 32, 0.40, 1.20], echo: ['long', 0.45] },
+};
+
+function envGain(t, peak, dur) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + 0.0015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    return g;
+}
+
+function noiseBurst(t, dur, filterType, freq, q, curve, peak, dest) {
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    const f = ctx.createBiquadFilter();
+    f.type = filterType; f.frequency.value = freq; f.Q.value = q;
+    const ws = ctx.createWaveShaper(); ws.curve = curve;
+    const g = envGain(t, peak, dur);
+    src.connect(f); f.connect(ws); ws.connect(g); g.connect(dest);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+}
+
+// BIG bang: a separate, much deeper explosion on top of the normal crackle sounds.
+// Hard crack, two overdriven tones dropping to 25Hz, a sub you feel, low rumble,
+// then the long street echo.
+function bigBang(volume, muffle, at, prof) {
+    const t = at || ctx.currentTime + 0.005;
+    const P = prof.pitch, L = prof.length, C = prof.crack;
+    const scale = rnd(0.94, 1.06) * L;
+
+    const out = ctx.createBiquadFilter();
+    out.type = 'lowpass';
+    out.frequency.value = 600 + 17000 * Math.pow(1 - Math.min(Math.max(muffle, 0), 1), 2);
+    const vol = ctx.createGain();
+    vol.gain.value = volume;
+    out.connect(vol); vol.connect(master);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.55;
+    vol.connect(wet); wet.connect(reverbs.long);
+
+    noiseBurst(t, 0.035, 'highpass', 400 * P, 0.7, hardShaper, 2.6 * C, out);   // crack
+    noiseBurst(t, 0.30 * scale, 'lowpass', 320 * P, 0.9, hardShaper, 1.6, out); // low rumble
+
+    for (const detune of [1, 1.06]) {
+        const o = ctx.createOscillator(); o.type = 'triangle';
+        o.frequency.setValueAtTime(95 * P * detune, t);
+        o.frequency.exponentialRampToValueAtTime(25, t + 0.35 * L);
+        const pre = ctx.createGain(); pre.gain.value = 4;
+        const ws = ctx.createWaveShaper(); ws.curve = hardShaper;
+        const og = envGain(t, 1.5, 0.38 * scale);
+        o.connect(pre); pre.connect(ws); ws.connect(og); og.connect(out);
+        o.start(t); o.stop(t + 0.4 * scale);
+    }
+
+    const sub = ctx.createOscillator(); sub.type = 'sine';
+    sub.frequency.setValueAtTime(58 * P, t);
+    sub.frequency.exponentialRampToValueAtTime(20, t + 0.6);
+    const sg = envGain(t, 1.6, 0.6);
+    sub.connect(sg); sg.connect(out);
+    sub.start(t); sub.stop(t + 0.62);
+}
+
+// prof = sound type from Config.SoundTypes: { pitch, length, crack } multipliers.
+const DEFAULT_PROFILE = { pitch: 1, length: 1, crack: 1 };
+
+function shot(kind, volume, muffle, at, prof) {
+    prof = Object.assign({}, DEFAULT_PROFILE, prof || {});
+    if (kind === 'big') return bigBang(volume, muffle, at, prof);
+    const k = KINDS[kind] || KINDS.pop;
+    const t = at || ctx.currentTime + 0.005;
+    const P = prof.pitch;
+    const scale = rnd(0.88, 1.12) * prof.length;
+    const hard = k.body[5];
+
+    // Distance muffling: further away = duller.
+    const out = ctx.createBiquadFilter();
+    out.type = 'lowpass';
+    out.frequency.value = 600 + 17000 * Math.pow(1 - Math.min(Math.max(muffle, 0), 1), 2);
+    const vol = ctx.createGain();
+    vol.gain.value = volume;
+    out.connect(vol); vol.connect(master);
+    if (k.echo) {
+        const wet = ctx.createGain();
+        wet.gain.value = k.echo[1];
+        vol.connect(wet); wet.connect(reverbs[k.echo[0]]);
+    }
+
+    const [cPeak, cDur, cHp] = k.crack;
+    noiseBurst(t, cDur, 'highpass', cHp * P, 0.7, hard ? hardShaper : shaper, cPeak * prof.crack, out);
+
+    const [bType, bF, bQ, bDur, bGain] = k.body;
+    noiseBurst(t, bDur * scale, bType, rnd(bF[0], bF[1]) * P, bQ, hard ? hardShaper : shaper, bGain, out);
+
+    const [f0, f1, oDur, oGain] = k.boom;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0 * P, t);
+    o.frequency.exponentialRampToValueAtTime(f1 * P, t + oDur * prof.length);
+    const og = envGain(t, oGain, oDur * scale);
+    o.connect(og); og.connect(out);
+    o.start(t); o.stop(t + oDur * scale + 0.02);
+
+    // Mega gets a second, slightly delayed report.
+    if (kind === 'mega' && !at) shot('bang', volume * 0.75, muffle, t + rnd(0.05, 0.09), prof);
+}
+
+function playShot(kind, volume, muffle, prof) {
+    init();
+    if (ctx.state === 'suspended') ctx.resume();
+    shot(kind, Math.max(0, Math.min(volume || 0, 1.5)), muffle || 0, null, prof);
+}
+
+window.addEventListener('message', (e) => {
+    const m = e.data;
+    if (!m || m.action !== 'sp_antilag') return;
+    playShot(m.kind, m.volume, m.muffle, m.profile);
+});
+</script>
+<script>
+// 2-Step panel. Talks to client.lua through NUI callbacks.
+const RES = typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'sp_antilag';
+const $ = (id) => document.getElementById(id);
+const post = (name, data) => fetch(`https://${RES}/${name}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {})
+}).catch(() => {});
+
+// localStorage can be missing or throw; positions are only a convenience.
+const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+
+let cfg = null;       // uiConfig() from client.lua
+let saved = null;     // last saved settings
+let draft = null;     // what the panel is editing
+let hotbar = [false, false, false];
+let testing = false;
+let repositioning = false;
+
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const INTENSITY_ICONS = { soft: 'fa-arrow-down', moderate: 'fa-gauge', max: 'fa-gauge-high' };
+
+function colourOf(key) {
+    if (key && key[0] === '#') return { key, label: key, hex: key };
+    return (cfg.colours.find(c => c.key === key)) || cfg.colours[0];
+}
+
+function applyTheme() {
+    const ui = cfg.ui || {};
+    const root = document.documentElement.style;
+    if (ui.Accent) {
+        root.setProperty('--accent', ui.Accent);
+        const n = parseInt(ui.Accent.slice(1), 16);
+        const rgb = `${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}`;
+        root.setProperty('--accent-soft', `rgba(${rgb}, 0.14)`);
+        root.setProperty('--accent-line', `rgba(${rgb}, 0.35)`);
+    }
+    if (ui.AccentGlow) root.setProperty('--accent-glow', ui.AccentGlow);
+    if (ui.Title) $('title').textContent = ui.Title;
+}
+
+// ---------- building ----------
+function buildStatic() {
+    const sel = $('soundSelect');
+    sel.innerHTML = '';
+    cfg.sounds.forEach(s => {
+        const o = document.createElement('option');
+        o.value = s.key; o.textContent = s.label;
+        sel.appendChild(o);
+    });
+    sel.disabled = !cfg.synth;
+    $('soundHint').textContent = cfg.synth ? 'Select to hear preview before saving' : 'Sound types need Config.SoundMode = \'synth\'';
+
+    document.querySelectorAll('[data-seg]').forEach(seg => {
+        const field = seg.dataset.seg;
+        seg.innerHTML = '';
+        cfg.intensity.forEach(it => {
+            const b = document.createElement('button');
+            b.dataset.value = it.key;
+            b.innerHTML = `<i class="fa-solid ${INTENSITY_ICONS[it.key] || 'fa-gauge'}"></i>${it.label.toUpperCase()}`;
+            b.onclick = () => { draft[field] = it.key; changed(); };
+            seg.appendChild(b);
+        });
+    });
+
+    const sw = $('swatches');
+    sw.innerHTML = '';
+    cfg.colours.forEach(c => {
+        const d = document.createElement('button');
+        d.className = 'swatch' + (c.hex === 'rainbow' ? ' rainbow' : '');
+        d.style.setProperty('--c', c.hex);
+        d.title = c.label;
+        d.dataset.key = c.key;
+        d.onclick = () => { draft.colour = c.key; changed(); };
+        sw.appendChild(d);
+    });
+
+    const rpm = $('rpmSlider');
+    rpm.min = cfg.launch.min; rpm.max = cfg.launch.max;
+    const size = $('sizeSlider');
+    size.min = cfg.size.Min; size.max = cfg.size.Max;
+
+    $('popsRow').classList.toggle('hidden', !cfg.popsEnabled);
+    $('gearRow').classList.toggle('hidden', !cfg.gearEnabled);
+    $('hotbarHint').textContent = cfg.hotbarKey
+        ? `Quick preset switch. Press ${cfg.hotbarKey} (configurable) in the vehicle to open the hotbar, then 1 / 2 / 3. Save the current config to a slot below.`
+        : 'Quick preset switch. Save the current config to a slot below.';
+}
+
+function summaryHtml(p) {
+    if (!p) return '<span>Empty</span>';
+    const c = colourOf(p.colour);
+    const it = cfg.intensity.find(i => i.key === p.intensity);
+    const snd = cfg.sounds.find(s => s.key === p.sound);
+    return `<span class="dot" style="--c:${c.hex === 'rainbow' ? '#fff' : c.hex}"></span>${c.label} · ${it ? it.label : ''} · ${snd ? snd.label.replace(/^Antilag \d+ - /, '') : ''}${p.launch ? ' · LC' : ''}`;
+}
+
+function renderPresets() {
+    const rows = $('presetRows');
+    rows.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+        const r = document.createElement('div');
+        r.className = 'preset-row';
+        r.innerHTML = `<span class="name">Preset</span><span class="num">${i + 1}</span>
+            <span class="summary">${summaryHtml(hotbar[i])}</span>
+            <span class="actions">${hotbar[i] ? '<button class="clear"><i class="fa-solid fa-trash"></i></button>' : ''}
+            <button class="save"><i class="fa-solid fa-floppy-disk"></i> Save</button></span>`;
+        r.querySelector('.save').onclick = () => {
+            hotbar[i] = clone(draft);
+            post('save', { settings: saved, hotbar, message: `Saved to preset ${i + 1}.` });
+            renderPresets();
+        };
+        const clear = r.querySelector('.clear');
+        if (clear) clear.onclick = () => {
+            hotbar[i] = false;
+            post('save', { settings: saved, hotbar, message: `Preset ${i + 1} cleared.` });
+            renderPresets();
+        };
+        rows.appendChild(r);
+    }
+}
+
+// ---------- rendering the draft ----------
+function render() {
+    document.querySelectorAll('[data-bind]').forEach(el => { el.checked = !!draft[el.dataset.bind]; });
+    $('soundSelect').value = draft.sound;
+    document.querySelectorAll('[data-seg]').forEach(seg => {
+        seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.value === draft[seg.dataset.seg]));
+    });
+    document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('active', s.dataset.key === draft.colour));
+    $('colourName').textContent = colourOf(draft.colour).label.toUpperCase();
+
+    $('rpmSlider').value = draft.launchRpm;
+    $('rpmValue').textContent = Math.round(draft.launchRpm * 100) + '%';
+    $('sizeSlider').value = draft.size;
+    $('sizeValue').textContent = Number(draft.size).toFixed(2) + 'x';
+    document.querySelectorAll('[data-pill]').forEach(p => p.classList.toggle('on', !!draft[p.dataset.pill]));
+
+    const lt = $('launchTab');
+    lt.classList.toggle('locked', !draft.launch);
+    if (!draft.launch && lt.classList.contains('active')) showTab('twostep');
+
+    $('testBtn').classList.toggle('testing', testing);
+    $('testBtn').innerHTML = testing ? 'TESTING' : '<i class="fa-solid fa-fire"></i> TEST';
+}
+
+function changed() {
+    render();
+    if (testing) post('updateTest', { draft });
+}
+
+// ---------- inputs ----------
+document.querySelectorAll('[data-bind]').forEach(el => {
+    el.addEventListener('change', () => { draft[el.dataset.bind] = el.checked; changed(); });
+});
+document.querySelectorAll('[data-pill]').forEach(p => {
+    p.onclick = () => { draft[p.dataset.pill] = !draft[p.dataset.pill]; changed(); };
+});
+$('soundSelect').addEventListener('change', (e) => {
+    draft.sound = e.target.value;
+    changed();
+    previewSound(draft.sound);
+});
+$('rpmSlider').addEventListener('input', (e) => { draft.launchRpm = parseFloat(e.target.value); changed(); });
+$('sizeSlider').addEventListener('input', (e) => { draft.size = parseFloat(e.target.value); changed(); });
+
+function previewSound(key) {
+    const prof = cfg.sounds.find(s => s.key === key);
+    const vol = Math.min(cfg.volume || 0.9, 1.0) * 0.8;
+    [['pop', 0], ['pop', 110], ['bang', 230], ['mega', 520]].forEach(([kind, delay]) => {
+        setTimeout(() => playShot(kind, vol, 0, prof), delay);
+    });
+}
+
+function showTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.page === name));
+}
+document.querySelectorAll('.tab').forEach(t => { t.onclick = () => showTab(t.dataset.tab); });
+
+$('saveBtn').onclick = () => {
+    saved = clone(draft);
+    post('save', { settings: saved, hotbar });
+};
+$('resetBtn').onclick = () => { draft = clone(saved); changed(); };
+$('closeBtn').onclick = () => post('close');
+
+$('testBtn').onclick = () => {
+    if (testing) return post('endTest');
+    testing = true;
+    $('panel').classList.add('testing');
+    $('testPrompt').classList.remove('hidden');
+    render();
+    post('startTest', { draft });
+};
+
+function testEnded() {
+    testing = false;
+    $('panel').classList.remove('testing');
+    $('testPrompt').classList.add('hidden');
+    if (draft) render();
+}
+
+document.addEventListener('keydown', (e) => {
+    if ($('panel').classList.contains('hidden')) return;
+    if (e.key === 'Backspace' && testing) { e.preventDefault(); post('endTest'); }
+    else if (e.key === 'Escape') { if (testing) post('endTest'); else post('close'); }
+});
+
+// ---------- dragging (panel + hotbar) ----------
+function makeDraggable(el, handle, key, canDrag) {
+    handle.addEventListener('mousedown', (e) => {
+        if (!canDrag() || e.target.closest('button')) return;
+        const r = el.getBoundingClientRect();
+        const dx = e.clientX - r.left, dy = e.clientY - r.top;
+        el.classList.add('placed');
+        const move = (ev) => {
+            const x = Math.max(0, Math.min(window.innerWidth - r.width, ev.clientX - dx));
+            const y = Math.max(0, Math.min(window.innerHeight - r.height, ev.clientY - dy));
+            el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.bottom = 'auto';
+        };
+        const up = () => {
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('mouseup', up);
+            store.set(key, { left: el.style.left, top: el.style.top });
+        };
+        move(e);
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+    });
+}
+
+function restorePosition(el, key) {
+    const p = store.get(key);
+    if (p && p.left) {
+        el.classList.add('placed');
+        el.style.left = p.left; el.style.top = p.top; el.style.bottom = 'auto';
+    }
+}
+
+makeDraggable($('panel'), $('dragHandle'), 'sp_antilag_panel', () => !testing);
+makeDraggable($('hotbar'), $('hotbar'), 'sp_antilag_hotbar', () => repositioning);
+
+$('centerBtn').onclick = () => {
+    const p = $('panel');
+    p.classList.remove('placed');
+    p.style.left = p.style.top = '';
+    store.set('sp_antilag_panel', null);
+};
+
+// ---------- hotbar ----------
+function renderHotbar(presets) {
+    const hb = $('hotbar');
+    hb.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+        const p = presets[i];
+        const d = document.createElement('div');
+        d.className = 'hb-slot' + (p ? '' : ' empty');
+        d.dataset.slot = i + 1;
+        let body = '<div class="line">Empty</div>';
+        if (p) {
+            const c = colourOf(p.colour);
+            const it = cfg.intensity.find(x => x.key === p.intensity);
+            body = `<div class="line"><span class="dot" style="--c:${c.hex === 'rainbow' ? '#fff' : c.hex}"></span>${c.label}</div>
+                    <div class="line">${it ? it.label : ''}${p.launch ? ' · LC' : ''}</div>`;
+        }
+        d.innerHTML = `<div class="top"><span>PRESET</span><span class="key">${i + 1}</span></div>${body}`;
+        hb.appendChild(d);
+    }
+}
+
+$('repositionBtn').onclick = () => {
+    repositioning = !repositioning;
+    const hb = $('hotbar');
+    $('repositionBtn').querySelector('span').textContent = repositioning ? 'Done' : 'Reposition Hotbar';
+    if (repositioning) {
+        renderHotbar(hotbar);
+        restorePosition(hb, 'sp_antilag_hotbar');
+        hb.classList.add('editing');
+        hb.classList.remove('hidden');
+    } else {
+        hb.classList.remove('editing');
+        hb.classList.add('hidden');
+    }
+};
+
+// ---------- messages from client.lua ----------
+window.addEventListener('message', (e) => {
+    const m = e.data;
+    if (!m || !m.action) return;
+    // The UI root stays display:none until something is actually opened.
+    if (m.action === 'open' || (m.action === 'hotbar' && m.show)) $('ui').style.display = 'block';
+    switch (m.action) {
+        case 'open': {
+            cfg = m.config;
+            applyTheme();
+            buildStatic();
+            saved = clone(m.settings);
+            draft = clone(m.settings);
+            hotbar = (m.hotbar || []).map(h => h || false);
+            while (hotbar.length < 3) hotbar.push(false);
+            const v = m.vehicle || {};
+            $('vName').textContent = (v.name || '-').toUpperCase();
+            $('vPlate').textContent = v.plate || '-';
+            $('vFuel').textContent = (v.fuel ?? '-') + '%';
+            $('vEngine').textContent = (v.engine ?? '-') + '%';
+            $('vTurbo').textContent = v.turbo ? 'Yes' : 'No';
+            renderPresets();
+            showTab('twostep');
+            testEnded();
+            restorePosition($('panel'), 'sp_antilag_panel');
+            $('panel').classList.remove('hidden');
+            render();
+            break;
+        }
+        case 'close':
+            testEnded();
+            if (repositioning) $('repositionBtn').click();
+            $('panel').classList.add('hidden');
+            break;
+        case 'testEnded':
+            testEnded();
+            break;
+        case 'testDevice':
+            $('kHold').textContent = m.keyboard ? 'SPACE' : 'RB';
+            $('kGas').textContent = m.keyboard ? 'W' : 'RT';
+            $('kExit').textContent = m.keyboard ? 'BACKSPACE' : 'B';
+            break;
+        case 'hotbar':
+            if (repositioning) break;
+            if (m.show) {
+                cfg = m.config || cfg;
+                applyTheme();
+                renderHotbar(m.presets || []);
+                restorePosition($('hotbar'), 'sp_antilag_hotbar');
+                $('hotbar').classList.remove('hidden');
+            } else {
+                $('hotbar').classList.add('hidden');
+            }
+            break;
+        case 'hotbarPick':
+            document.querySelectorAll('.hb-slot').forEach(s => s.classList.toggle('picked', Number(s.dataset.slot) === m.slot));
+            break;
+    }
+});
+</script>
 </body>
 </html>
