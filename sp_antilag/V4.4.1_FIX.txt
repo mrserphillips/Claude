@@ -1,0 +1,9 @@
+V4.4.1
+- Pop/bang sounds are no longer played as networked sounds. Nearby players already
+  play them from the synced effect event, so the networked copy could double up.
+- The "Anti-lag active" message now shows the running version, e.g.
+  "Anti-lag v4.4.1 active on PLATE", so you can confirm the server is running this build.
+
+If you see "attempt to call a nil value (global 'StartParticleFxNonLoopedOnEntityBone')"
+the server is still running an OLD copy (V4.2) of sp_antilag - that call does not exist
+in V4.2.1 or later. See INSTALL.txt / RESOURCE_STRUCTURE.txt and remove the old folder.

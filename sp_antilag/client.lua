@@ -153,7 +153,9 @@ end
 local function nativeSound(vehicle,kind)
     local s=Config.NativeSounds[kind] or Config.NativeSounds.pop
     -- The sound belongs to the vehicle entity rather than the NUI/browser.
-    PlaySoundFromEntity(-1,s.name,vehicle,s.set,true,0)
+    -- Not networked: other clients already play it themselves from the synced
+    -- sp_antilag:effect event, so a networked sound would double up.
+    PlaySoundFromEntity(-1,s.name,vehicle,s.set,false,0)
 end
 
 local function spawnFlame(p,heading,scale,r,g,b)
@@ -276,7 +278,7 @@ CreateThread(function()
                 local plate=plateOf(vehicle)
                 if activePlate~=plate then
                     activePlate=plate
-                    lib.notify({type='success',description='Anti-lag active on '..plate..' - /'..Config.MenuCommand..' to tune'})
+                    lib.notify({type='success',description=('Anti-lag v%s active on %s - /%s to tune'):format(GetResourceMetadata(GetCurrentResourceName(),'version',0) or '?',plate,Config.MenuCommand)})
                 end
 
                 local throttle=GetControlNormal(0,71)
