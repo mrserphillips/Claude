@@ -434,13 +434,14 @@ function noiseBurst(t, dur, filterType, freq, q, curve, peak, dest, post) {
     src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
 }
 
-// BIG bang: a separate, much deeper explosion on top of the normal crackle sounds.
-// Hard crack, two overdriven tones dropping to 25Hz, a sub you feel, low rumble,
-// then the long street echo.
-function bigBang(volume, muffle, at, prof) {
+// Gunshot-style bang (BIG and mega). Measured from real anti-lag recordings: the shot
+// hits in ~2ms and drops 20dB within ~12ms. No pitch sweep (a sweep is what makes a
+// kick drum); the "gunshot" is an instant clipped crack + a short thump + slapback echo
+// off the buildings around the car.
+//   size: 1 = BIG, smaller = mega.   tone: centre of the crack body in Hz.
+function gunshot(volume, muffle, at, prof, size, tone) {
     const t = at || ctx.currentTime + 0.005;
     const P = prof.pitch, L = prof.length, C = prof.crack;
-    const scale = rnd(0.94, 1.06) * L;
 
     const out = ctx.createBiquadFilter();
     out.type = 'lowpass';
@@ -448,34 +449,45 @@ function bigBang(volume, muffle, at, prof) {
     const vol = ctx.createGain();
     vol.gain.value = volume;
     out.connect(vol); vol.connect(master);
-    const dark = ctx.createBiquadFilter();
-    dark.type = 'lowpass'; dark.frequency.value = 500;
-    const wet = ctx.createGain();
-    wet.gain.value = 0.6;
-    vol.connect(dark); dark.connect(wet); wet.connect(reverbs.long);
 
-    noiseBurst(t, 0.025, 'highpass', 400 * P, 0.7, shaper, 1.6 * C, out, 2600);        // crack
-    noiseBurst(t, 0.30 * scale, 'lowpass', 320 * P, 0.9, hardShaper, 1.6, out, 380);  // low rumble
-
-    for (const detune of [1, 1.06]) {
-        const o = ctx.createOscillator(); o.type = 'triangle';
-        o.frequency.setValueAtTime(95 * P * detune, t);
-        o.frequency.exponentialRampToValueAtTime(25, t + 0.35 * L);
-        const pre = ctx.createGain(); pre.gain.value = 4;
-        const ws = ctx.createWaveShaper(); ws.curve = hardShaper;
-        const og = envGain(t, 1.5, 0.38 * scale);
-        const lp = ctx.createBiquadFilter();
-        lp.type = 'lowpass'; lp.frequency.value = 520;
-        o.connect(pre); pre.connect(ws); ws.connect(lp); lp.connect(og); og.connect(out);
-        o.start(t); o.stop(t + 0.4 * scale);
+    // Slapback: two dull, delayed reflections, then a short dark room tail.
+    for (const [delay, lp, g] of [[rnd(0.075, 0.095), 900, 0.34 * size], [rnd(0.17, 0.21), 550, 0.18 * size]]) {
+        const dl = ctx.createDelay(1); dl.delayTime.value = delay;
+        const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp;
+        const gn = ctx.createGain(); gn.gain.value = g;
+        vol.connect(dl); dl.connect(f); f.connect(gn); gn.connect(master);
     }
+    const dark = ctx.createBiquadFilter();
+    dark.type = 'lowpass'; dark.frequency.value = 600;
+    const wet = ctx.createGain(); wet.gain.value = 0.22 * size;
+    vol.connect(dark); dark.connect(wet); wet.connect(reverbs.short);
 
-    const sub = ctx.createOscillator(); sub.type = 'sine';
-    sub.frequency.setValueAtTime(58 * P, t);
-    sub.frequency.exponentialRampToValueAtTime(20, t + 0.6);
-    const sg = envGain(t, 1.6, 0.6);
-    sub.connect(sg); sg.connect(out);
-    sub.start(t); sub.stop(t + 0.62);
+    // Crack: wide noise, driven into hard clipping, low-passed after so it snaps without hiss.
+    const pre = 1.6 + 1.4 * size;
+    const src = ctx.createBufferSource(); src.buffer = noise;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500 * P;
+    const drive = ctx.createGain(); drive.gain.value = pre;
+    const ws = ctx.createWaveShaper(); ws.curve = hardShaper;
+    const post = ctx.createBiquadFilter(); post.type = 'lowpass'; post.frequency.value = 3000;
+    const cg = envGain(t, 1.25 * C, 0.045 * L);
+    src.connect(hp); hp.connect(lp); lp.connect(drive); drive.connect(ws); ws.connect(post); post.connect(cg); cg.connect(out);
+    src.start(t, Math.random() * 0.5); src.stop(t + 0.07 * L);
+
+    // Body: the chest of the shot, centred where the recordings peak. Fixed pitch, very short.
+    noiseBurst(t, 0.055 * L, 'bandpass', tone * P, 1.3, shaper, 2.6 * size, out, tone * P * 4);
+    noiseBurst(t, 0.035 * L, 'bandpass', tone * 3 * P, 1.1, shaper, 0.9, out, tone * P * 10);
+
+    // Thump: one fixed-pitch low hit, gone in ~20ms (no downward sweep).
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.value = 125 * P;
+    const og = envGain(t, 1.7 * size, 0.06 * L);
+    o.connect(og); og.connect(out);
+    o.start(t); o.stop(t + 0.08 * L);
+}
+
+function bigBang(volume, muffle, at, prof) {
+    gunshot(volume, muffle, at, prof, 1.0, 160);
 }
 
 // prof = sound type from Config.SoundTypes: { pitch, length, crack } multipliers.
@@ -559,6 +571,11 @@ function exhaustBang(kind, volume, muffle, at, prof) {
 function shot(kind, volume, muffle, at, prof) {
     prof = Object.assign({}, DEFAULT_PROFILE, prof || {});
     if (kind === 'big') return bigBang(volume, muffle, at, prof);
+    if (kind === 'mega') {
+        gunshot(volume, muffle, at, prof, 0.75, 300);
+        if (!at) gunshot(volume * 0.6, muffle, ctx.currentTime + 0.005 + rnd(0.06, 0.1), prof, 0.5, 340);
+        return;
+    }
     if (BANGS[kind]) return exhaustBang(kind, volume, muffle, at, prof);
     const k = KINDS[kind] || KINDS.pop;
     const t = at || ctx.currentTime + 0.005;
