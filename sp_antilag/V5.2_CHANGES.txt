@@ -1,0 +1,8 @@
+V5.2 - Supra-style anti-lag rattle
+- Pops and bangs are now an anti-lag rattle ("brrrap") tuned against a Supra anti-lag
+  recording: each shot plays 3-5 (pop) or 5-8 (bang) micro-hits 13-35ms apart with +-2dB
+  level jitter, peaking at 150-250Hz with a crisp rattle band at 2.5-6kHz.
+- Holding the limiter (2-step shots every 130-180ms) now runs together into one continuous
+  brrrrap at ~40 hits a second, like the recording. Overrun crackle gives separate braps.
+- The micro-hits are played by each client from the one networked shot, so network
+  traffic is unchanged. Mega and BIG bangs keep the gunshot sound.

@@ -483,54 +483,54 @@ function bigBang(volume, muffle, at, prof) {
 // prof = sound type from Config.SoundTypes: { pitch, length, crack } multipliers.
 const DEFAULT_PROFILE = { pitch: 1, length: 1, crack: 1 };
 
-// 2-step pops / bangs. Tuned against a real 2-step recording: each hit is a punchy
-// mid "bark" peaking at 200-300Hz, rolling off ~6dB/oct above 500Hz, almost nothing
-// above 2kHz. It drops ~7dB in the first 15ms and ~13dB by 40ms. About 1 in 3 hits
-// is a double, a second report 30-40ms behind the first.
-//   body  = main pipe bark [centre Hz, Q, peak, dur]
-//   upper = the rasp on top  [centre Hz, Q, peak, dur]
-//   thump = short fixed-pitch low hit [Hz, peak, dur]
-//   crack = tiny front edge [peak, dur]
-const HITS = {
-    pop:  { body: [300, 1.4, 1.5, 0.34], upper: [720, 1.2, 0.28, 0.10], thump: [95, 0.30, 0.06], crack: [0.75, 0.006], echo: 0.30, double: 0.30 },
-    bang: { body: [240, 1.2, 2.3, 0.44], upper: [600, 1.1, 0.42, 0.13], thump: [90, 0.60, 0.08], crack: [1.30, 0.007], echo: 0.40, double: 0.35 },
+// Anti-lag rattle ("brrrap"), tuned against a Supra anti-lag recording: ~30-45 micro-hits
+// a second, 13-35ms apart (median 22ms), level jumping about +-2dB hit to hit. Energy peaks
+// at 150-250Hz with a crisp rattle band at 2.5-6kHz. Each networked pop/bang plays one
+// short rattle; back-to-back shots from the 2-step run together into a continuous brrrap.
+//   hits = [min, max] micro-hits per shot, first = level of the opening hit
+const RATTLE = {
+    pop:  { hits: [3, 5], first: 1.0,  body: 1.00, thump: 0.10 },
+    bang: { hits: [5, 8], first: 1.45, body: 1.25, thump: 0.20 },
 };
 
-function hit(kind, volume, muffle, t, prof, allowDouble) {
-    const k = HITS[kind];
-    const P = prof.pitch;
-    const L = rnd(0.88, 1.12) * prof.length;
+function microHit(t, lvl, prof, out) {
+    const P = prof.pitch, L = prof.length;
+    const bf = 190 * P * rnd(0.88, 1.12);
+    noiseBurst(t, 0.07 * L, 'bandpass', bf, 2.4, shaper, 1.0 * lvl, out, 380);        // body
+    noiseBurst(t, 0.016 * L, 'bandpass', 3600 * rnd(0.8, 1.25), 0.9, shaper,
+               0.11 * lvl * prof.crack, out, 7500);                                       // crisp rattle
+    noiseBurst(t, 0.03 * L, 'bandpass', 480 * P * rnd(0.85, 1.15), 1.6, shaper, 0.14 * lvl, out, 900);  // bark
+}
 
+function rattle(kind, volume, muffle, t, prof) {
+    const k = RATTLE[kind] || RATTLE.pop;
     const out = ctx.createBiquadFilter();
     out.type = 'lowpass';
     out.frequency.value = 600 + 17000 * Math.pow(1 - Math.min(Math.max(muffle, 0), 1), 2);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 85;
     const vol = ctx.createGain();
     vol.gain.value = volume;
-    out.connect(vol); vol.connect(master);
+    out.connect(hp); hp.connect(vol); vol.connect(master);
     const dark = ctx.createBiquadFilter();
     dark.type = 'lowpass'; dark.frequency.value = 700;
-    const wet = ctx.createGain(); wet.gain.value = k.echo;
+    const wet = ctx.createGain(); wet.gain.value = 0.18;
     vol.connect(dark); dark.connect(wet); wet.connect(reverbs.short);
 
-    const [bF, bQ, bP, bD] = k.body;
-    const bf = bF * P * rnd(0.88, 1.12);
-    noiseBurst(t, bD * L, 'bandpass', bf, bQ, shaper, bP, out, bf * 2.5);
-
-    const [uF, uQ, uP, uD] = k.upper;
-    noiseBurst(t, uD * L, 'bandpass', uF * P * rnd(0.85, 1.15), uQ, shaper, uP, out, 2200);
-
-    const [cP, cD] = k.crack;
-    noiseBurst(t, cD, 'highpass', 1200 * P, 0.7, shaper, cP * prof.crack, out, 3000);
-
-    const [tF, tP, tD] = k.thump;
+    // One short low thump under the opening hit gives the burst its weight.
     const o = ctx.createOscillator(); o.type = 'sine';
-    o.frequency.value = tF * P;
-    const og = envGain(t, tP, tD * L);
+    o.frequency.value = 120 * prof.pitch;
+    const og = envGain(t, k.thump, 0.05 * prof.length);
     o.connect(og); og.connect(out);
-    o.start(t); o.stop(t + tD * L + 0.02);
+    o.start(t); o.stop(t + 0.07 * prof.length);
 
-    if (allowDouble && Math.random() < k.double) {
-        hit(kind, volume * rnd(0.5, 0.75), muffle, t + rnd(0.03, 0.04), prof, false);
+    const n = k.hits[0] + Math.floor(Math.random() * (k.hits[1] - k.hits[0] + 1));
+    let at = t;
+    for (let i = 0; i < n; i++) {
+        const jitter = Math.pow(10, rnd(-2.2, 2.2) / 20);
+        microHit(at, (i === 0 ? k.first : 1) * k.body * jitter * (1 - 0.06 * i), prof, out);
+        // 13-35ms apart, most around 20ms.
+        at += (13 + Math.pow(Math.random(), 1.6) * 22) / 1000;
     }
 }
 
@@ -542,7 +542,7 @@ function shot(kind, volume, muffle, at, prof) {
         if (!at) gunshot(volume * 0.6, muffle, ctx.currentTime + 0.005 + rnd(0.06, 0.1), prof, 0.5, 340);
         return;
     }
-    hit(HITS[kind] ? kind : 'pop', volume, muffle, at || ctx.currentTime + 0.005, prof, true);
+    rattle(RATTLE[kind] ? kind : 'pop', volume, muffle, at || ctx.currentTime + 0.005, prof);
 }
 
 function playShot(kind, volume, muffle, prof) {

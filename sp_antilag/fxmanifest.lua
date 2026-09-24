@@ -4,7 +4,7 @@ lua54 'yes'
 
 author 'SP'
 description 'Mechanic-fitted anti-lag / 2-step with launch control and a tuning panel'
-version '5.1.0'
+version '5.2.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
