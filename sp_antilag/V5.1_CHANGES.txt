@@ -1,0 +1,9 @@
+V5.1 - 2-step sound + rhythm
+- Pops and bangs rebuilt against a real 2-step recording: a punchy mid "bark" peaking at
+  200-300Hz with a small crack on top, ~35% of hits are doubles (second report 30-40ms
+  behind). The old pop was centred at 900-1900Hz (too bright), the old bang at ~90Hz (too low).
+- Holding the limiter is now a continuous 2-step barrage instead of a 5-shot burst then a
+  pause. Per intensity in Config.Intensity: gap = {min,max} ms between shots, mix = weights
+  for pop / bang / mega / big. Moderate fires every 130-180ms, like the recording.
+- Launch control and panel test mode use the same barrage.
+- Removed Config.LimiterSequence, Config.LimiterCooldownMs and Config.TestMode (no longer used).

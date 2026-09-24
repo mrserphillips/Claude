@@ -27,16 +27,13 @@ Config.NativeSounds = {
 -- V4 uses driver input instead of addon-dependent RPM values.
 Config.LimiterThrottle = 0.82
 Config.LimiterHoldMs = 300
-Config.LimiterCooldownMs = 720
 Config.LiftThrottleBefore = 0.55
 Config.LiftThrottleAfter = 0.08
 Config.LiftCooldownMs = 520
 
 -- Burst patterns: { kind, gap after this shot in ms }. kind = 'pop' | 'bang' | 'mega' | 'big'.
 -- Keep gaps >= 75ms so nearby players receive every shot (server rate gate is 70ms).
-Config.LimiterSequence = {      -- held throttle, stationary
-    { 'pop', 85 }, { 'bang', 110 }, { 'pop', 85 }, { 'mega', 220 }, { 'big', 0 }
-}
+-- (The held-throttle 2-step is a continuous barrage, see Config.Intensity.)
 Config.LiftSequence = {         -- lift off at speed
     { 'bang', 100 }, { 'pop', 90 }, { 'mega', 240 }, { 'big', 0 }
 }
@@ -187,20 +184,25 @@ Config.SoundTypes = {
     { key = 'muscle',  label = 'Antilag 8 - Muscle',  pitch = 0.80, length = 1.20, crack = 1.00 },
 }
 
--- Intensity levels. cooldown multiplies Config.LimiterCooldownMs, flame multiplies the
--- flame size, chance = chance a limiter burst fires at all, maxSpeed = 2-step speed window.
+-- Intensity levels. While you hold the limiter the 2-step fires a continuous barrage
+-- (like a real 2-step): one shot every gap ms (random between min and max), each shot
+-- picked from mix by weight. flame multiplies the flame size, chance = chance each
+-- shot actually fires (lower = more ragged), maxSpeed = 2-step speed window (km/h).
 Config.Intensity = {
     soft = {
-        label = 'Soft', cooldown = 1.6, flame = 0.80, chance = 0.75, maxSpeed = 8.0,
-        sequence = { { 'pop', 95 }, { 'pop', 95 }, { 'bang', 0 } }
+        label = 'Soft', flame = 0.80, chance = 0.80, maxSpeed = 8.0,
+        gap = { 190, 270 },
+        mix = { pop = 0.70, bang = 0.30 },
     },
     moderate = {
-        label = 'Moderate', cooldown = 1.0, flame = 1.00, chance = 1.0, maxSpeed = 12.0,
-        sequence = nil -- nil = Config.LimiterSequence
+        label = 'Moderate', flame = 1.00, chance = 0.95, maxSpeed = 12.0,
+        gap = { 130, 180 },
+        mix = { pop = 0.45, bang = 0.47, mega = 0.08 },
     },
     max = {
-        label = 'Maximum', cooldown = 0.7, flame = 1.25, chance = 1.0, maxSpeed = 16.0,
-        sequence = { { 'bang', 85 }, { 'pop', 80 }, { 'mega', 110 }, { 'bang', 90 }, { 'mega', 220 }, { 'big', 0 } }
+        label = 'Maximum', flame = 1.25, chance = 1.0, maxSpeed = 16.0,
+        gap = { 105, 150 },
+        mix = { pop = 0.30, bang = 0.50, mega = 0.15, big = 0.05 },
     },
 }
 
@@ -231,7 +233,4 @@ Config.Hotbar = {
 }
 
 -- Test mode (Colors tab > TEST): the car is frozen, hold handbrake + throttle to rev and see
--- the unsaved flame. Backspace ends it.
-Config.TestMode = {
-    CooldownMs = 650,
-}
+-- the unsaved flame, firing at the draft's intensity. Backspace ends it.

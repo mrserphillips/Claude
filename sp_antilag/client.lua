@@ -341,8 +341,23 @@ local function burst(vehicle,sequence,look,sizeMul)
 end
 
 local function intensityOf(key)
-    local it=Config.Intensity[key] or Config.Intensity.moderate
-    return it,(it.sequence or Config.LimiterSequence)
+    return Config.Intensity[key] or Config.Intensity.moderate
+end
+
+-- Weighted pick from an intensity's mix, e.g. { pop = 0.45, bang = 0.47, mega = 0.08 }.
+local function pickKind(mix)
+    local total=0
+    for _,w in pairs(mix) do total=total+w end
+    local r=math.random()*total
+    for _,kind in ipairs({'pop','bang','mega','big'}) do
+        r=r-(mix[kind] or 0)
+        if r<=0 and (mix[kind] or 0)>0 then return kind end
+    end
+    return 'pop'
+end
+
+local function randomGap(it)
+    return math.random(it.gap[1],it.gap[2])
 end
 
 local function liftBurst(vehicle) burst(vehicle,Config.LiftSequence) end
@@ -374,6 +389,7 @@ end
 local lastThrottle=0.0
 local limiterSince=nil
 local lastLimiter=0
+local limiterGap=0
 local lastLift=0
 local lastPopcorn=0
 local activePlate=nil
@@ -388,17 +404,17 @@ local function resetState()
     limiterSince=nil; lastThrottle=0.0; activePlate=nil; overrunSince=nil; lastGear=nil
 end
 
--- One 2-step hit on the limiter at the given intensity (popcorn may replace it).
-local function limiterHit(vehicle,settings,intensityKey,look)
-    local it,sequence=intensityOf(intensityKey)
+-- One 2-step shot on the limiter. Returns how long to wait before the next one.
+local function limiterShot(vehicle,settings,intensityKey,look)
+    local it=intensityOf(intensityKey)
     local now=GetGameTimer()
     if settings.popcorn and now-lastPopcorn>=Config.Popcorn.CooldownMs and math.random()<Config.Popcorn.Chance then
         lastPopcorn=now
         CreateThread(function() popcorn(vehicle,look) end)
-        return
+        return Config.Popcorn.Shots[2]*Config.Popcorn.GapMs[2]
     end
-    if math.random()>it.chance then return end
-    CreateThread(function() burst(vehicle,sequence,look,it.flame) end)
+    if math.random()<=it.chance then send(vehicle,pickKind(it.mix),true,look,it.flame) end
+    return randomGap(it)
 end
 
 CreateThread(function()
@@ -431,18 +447,17 @@ CreateThread(function()
                     local cap=settings.launchRpm or lc.DefaultRpm
                     if GetVehicleCurrentRpm(vehicle)>cap then SetVehicleCurrentRpm(vehicle,cap) end
                     limiterSince=limiterSince or now
-                    local it=intensityOf(settings.launchIntensity)
-                    if now-limiterSince>=Config.LimiterHoldMs and now-lastLimiter>=Config.LimiterCooldownMs*it.cooldown then
+                    if now-limiterSince>=Config.LimiterHoldMs and now-lastLimiter>=limiterGap then
                         lastLimiter=now
-                        limiterHit(vehicle,settings,settings.launchIntensity,lookOf(settings))
+                        limiterGap=limiterShot(vehicle,settings,settings.launchIntensity,lookOf(settings))
                     end
                 else
                     local it=intensityOf(settings.intensity)
                     if speed<it.maxSpeed and throttle>=Config.LimiterThrottle then
                         limiterSince=limiterSince or now
-                        if now-limiterSince>=Config.LimiterHoldMs and now-lastLimiter>=Config.LimiterCooldownMs*it.cooldown then
+                        if now-limiterSince>=Config.LimiterHoldMs and now-lastLimiter>=limiterGap then
                             lastLimiter=now
-                            limiterHit(vehicle,settings,settings.intensity,lookOf(settings))
+                            limiterGap=limiterShot(vehicle,settings,settings.intensity,lookOf(settings))
                         end
                     else
                         limiterSince=nil
@@ -626,6 +641,7 @@ end)
 -- Test mode: freeze the car, rev with handbrake + throttle, the unsaved draft is used.
 local function testLoop()
     local lastShot=0
+    local testGap=0
     local device=nil
     while testing do
         local vehicle=testing.vehicle
@@ -644,11 +660,12 @@ local function testLoop()
         local throttle=GetControlNormal(0,71)
         local now=GetGameTimer()
         if throttle>=Config.LimiterThrottle and IsControlPressed(0,Config.LaunchControl.HoldControl)
-        and now-lastShot>=Config.TestMode.CooldownMs then
+        and now-lastShot>=testGap then
             lastShot=now
             local draft=testing.draft
-            local it,sequence=intensityOf(draft.intensity)
-            CreateThread(function() burst(vehicle,sequence,lookOf(draft),it.flame) end)
+            local it=intensityOf(draft.intensity)
+            send(vehicle,pickKind(it.mix),true,lookOf(draft),it.flame)
+            testGap=randomGap(it)
         end
         Wait(0)
     end
