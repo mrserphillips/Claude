@@ -1,0 +1,19 @@
+V5.0 - 2-Step panel
+- /antilag now opens a blue tuning panel (NUI) instead of the ox_lib menu. Drag it by the
+  title bar; the crosshair button re-centres it. Accent colour/title in Config.UI.
+- ANTILAG - 2STEP tab: vehicle info, master on/off, launch control on/off, antilag sound type
+  (Config.SoundTypes, plays a preview when picked) and intensity Soft / Moderate / Maximum
+  (Config.Intensity: cooldown, flame size, chance, speed window, burst pattern).
+- LAUNCH CONTROL tab (unlocks when launch control is on): hold SPACE + W while stopped, revs
+  are held at the RPM limiter set here and the 2-step fires at the launch intensity.
+- COLORS tab: 30 flame colours (Config.FlameColours), flame size slider, Compatibility Mode
+  (uses Config.CompatColourFx for exhausts that will not take colour) and TEST: the panel
+  shrinks aside, the car is frozen, hold SPACE + W to rev and see the unsaved colour. Colour
+  changes apply instantly and nearby players see them. Backspace ends the test.
+- HOTBAR tab: three presets per vehicle. Press N (Config.Hotbar.Key, rebindable) while driving,
+  then 1 / 2 / 3 to switch. Reposition Hotbar lets you drag it anywhere.
+- MISC tab: pops & bangs, popcorn mode (Config.Popcorn), gear change bangs, silent mode,
+  hide flames.
+- Everything is saved per plate in a new `settings` JSON column (added automatically).
+- Server exports: SetSettings(plate, changes), GetSettings(plate). Client export: OpenMenu().
+- Fixed Config.SoundMode = 'native' erroring (loadedBanks was never defined).

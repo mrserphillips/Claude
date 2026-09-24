@@ -22,11 +22,65 @@ local function validColour(colour)
     return nil
 end
 
-local function defaultSettings()
+local soundKeys, intensityKeys = {}, {}
+for _, t in ipairs(Config.SoundTypes) do soundKeys[t.key] = true end
+for k in pairs(Config.Intensity) do intensityKeys[k] = true end
+
+local function clamp(v, lo, hi, def)
+    v = tonumber(v)
+    if not v or v ~= v then return def end
+    return math.max(lo, math.min(hi, v))
+end
+
+local function bool(v, def)
+    if v == nil then return def end
+    return v == true
+end
+
+-- Every value the panel can change. Anything a client sends goes through here.
+local function sanitize(src, base)
+    src = type(src) == 'table' and src or {}
+    base = base or {}
+    local lc, fs = Config.LaunchControl, Config.FlameSize
     return {
-        colour = validColour(Config.DefaultFlameColour) or 'stock',
-        pops = Config.PopsBangs.DefaultOn == true
+        colour = validColour(src.colour) or base.colour or validColour(Config.DefaultFlameColour) or 'stock',
+        pops = bool(src.pops, base.pops ~= nil and base.pops or Config.PopsBangs.DefaultOn == true),
+        enabled = bool(src.enabled, base.enabled ~= false),
+        launch = bool(src.launch, base.launch == true),
+        launchRpm = clamp(src.launchRpm, lc.MinRpm, lc.MaxRpm, base.launchRpm or lc.DefaultRpm),
+        launchIntensity = intensityKeys[src.launchIntensity] and src.launchIntensity or base.launchIntensity or 'moderate',
+        intensity = intensityKeys[src.intensity] and src.intensity or base.intensity or 'moderate',
+        sound = soundKeys[src.sound] and src.sound or base.sound or Config.SoundTypes[1].key,
+        size = clamp(src.size, fs.Min, fs.Max, base.size or fs.Default),
+        popcorn = bool(src.popcorn, base.popcorn == true),
+        silent = bool(src.silent, base.silent == true),
+        hideFlames = bool(src.hideFlames, base.hideFlames == true),
+        gear = bool(src.gear, base.gear ~= nil and base.gear or Config.GearChange.Enabled),
+        compat = bool(src.compat, base.compat == true),
     }
+end
+
+local function sanitizeHotbar(h)
+    local out = {}
+    if type(h) ~= 'table' then return out end
+    for i = 1, 3 do
+        local slot = h[i] or h[tostring(i)]
+        if type(slot) == 'table' then out[i] = sanitize(slot) end
+    end
+    return out
+end
+
+local function defaultSettings()
+    local s = sanitize({})
+    s.hotbar = {}
+    return s
+end
+
+local function saveRow(plate, s)
+    local stored = {}
+    for k, v in pairs(s) do stored[k] = v end
+    MySQL.update.await('UPDATE sp_antilag SET flame_colour = ?, pops_bangs = ?, settings = ? WHERE plate = ?',
+        { s.colour, s.pops and 1 or 0, json.encode(stored), plate })
 end
 
 local function columnExists(column)
@@ -46,13 +100,20 @@ CreateThread(function()
     if not columnExists('pops_bangs') then
         MySQL.query.await('ALTER TABLE sp_antilag ADD COLUMN pops_bangs TINYINT(1) NOT NULL DEFAULT 1')
     end
+    -- V5.0: full panel settings + hotbar presets as JSON.
+    if not columnExists('settings') then
+        MySQL.query.await('ALTER TABLE sp_antilag ADD COLUMN settings LONGTEXT NULL')
+    end
 
-    local rows = MySQL.query.await('SELECT plate, flame_colour, pops_bangs FROM sp_antilag') or {}
+    local rows = MySQL.query.await('SELECT plate, flame_colour, pops_bangs, settings FROM sp_antilag') or {}
     for _, row in ipairs(rows) do
-        installed[cleanPlate(row.plate)] = {
-            colour = validColour(row.flame_colour) or 'stock',
-            pops = row.pops_bangs == 1 or row.pops_bangs == true
-        }
+        local stored = row.settings and json.decode(row.settings) or {}
+        if type(stored) ~= 'table' then stored = {} end
+        if stored.colour == nil then stored.colour = row.flame_colour end
+        if stored.pops == nil then stored.pops = row.pops_bangs == 1 or row.pops_bangs == true end
+        local settings = sanitize(stored)
+        settings.hotbar = sanitizeHotbar(stored.hotbar)
+        installed[cleanPlate(row.plate)] = settings
     end
     ready = true
     -- Anyone who asked before loading finished may have cached "not fitted"; make them re-check.
@@ -96,8 +157,8 @@ RegisterNetEvent('sp_antilag:finishInstall', function(netId, expectedPlate)
     if (exports.ox_inventory:Search(src,'count',Config.KitItem) or 0) < 1 then return end
     if not exports.ox_inventory:RemoveItem(src,Config.KitItem,1) then return end
     local settings=defaultSettings()
-    MySQL.query.await('INSERT IGNORE INTO sp_antilag (plate, flame_colour, pops_bangs) VALUES (?, ?, ?)',
-        {plate, settings.colour, settings.pops and 1 or 0})
+    MySQL.query.await('INSERT IGNORE INTO sp_antilag (plate, flame_colour, pops_bangs, settings) VALUES (?, ?, ?, ?)',
+        {plate, settings.colour, settings.pops and 1 or 0, json.encode(settings)})
     installed[plate]=settings
     TriggerClientEvent('sp_antilag:setInstalled',-1,plate,settings)
     TriggerClientEvent('ox_lib:notify',src,{type='success',description='Anti-lag fitted successfully.'})
@@ -133,44 +194,86 @@ RegisterNetEvent('sp_antilag:remove', function(netId, expectedPlate)
     TriggerClientEvent('ox_lib:notify',src,{type='success',description='Anti-lag removed successfully.'})
 end)
 
--- V4.4: flame colour / pops & bangs settings. Sender must be in the driver seat of the fitted vehicle.
+-- Returns the plate and saved settings when src may change this vehicle's settings.
+local function editableVehicle(src, netId, expectedPlate)
+    if Config.SettingsPermission=='mechanic' and not isMechanic(src) then
+        TriggerClientEvent('ox_lib:notify',src,{type='error',description='Only a mechanic can tune the anti-lag.'})
+        return nil
+    end
+    local entity=NetworkGetEntityFromNetworkId(netId)
+    if entity==0 or not DoesEntityExist(entity) then return nil end
+    if GetPedInVehicleSeat(entity,-1)~=GetPlayerPed(src) then
+        TriggerClientEvent('ox_lib:notify',src,{type='error',description='You must be in the driver seat.'})
+        return nil
+    end
+    local plate=cleanPlate(GetVehicleNumberPlateText(entity))
+    if plate=='' or plate~=cleanPlate(expectedPlate) then return nil end
+    local current=installed[plate]
+    if not current then return nil end
+    return plate,current
+end
+
+local saveRate={}
+local function saveLimited(src)
+    local now=os.clock()
+    if saveRate[src] and now-saveRate[src]<0.5 then return true end
+    saveRate[src]=now
+    return false
+end
+
+-- V5.0: whole-panel save. `changes` may hold any settings field plus `hotbar`.
+RegisterNetEvent('sp_antilag:saveSettings', function(netId, expectedPlate, changes, message)
+    local src=source
+    if saveLimited(src) or type(changes)~='table' then return end
+    local plate,current=editableVehicle(src,netId,expectedPlate)
+    if not plate then return end
+
+    if changes.colour~=nil and not validColour(changes.colour) then
+        return TriggerClientEvent('ox_lib:notify',src,{type='error',description='Invalid flame colour.'})
+    end
+    local updated=sanitize(changes,current)
+    updated.hotbar=changes.hotbar~=nil and sanitizeHotbar(changes.hotbar) or current.hotbar or {}
+
+    saveRow(plate,updated)
+    installed[plate]=updated
+    TriggerClientEvent('sp_antilag:setInstalled',-1,plate,updated)
+    TriggerClientEvent('ox_lib:notify',src,{type='success',description=type(message)=='string' and message:sub(1,80) or 'Anti-lag settings saved.'})
+end)
+
+-- Kept for anything still calling the V4.4 event.
 RegisterNetEvent('sp_antilag:updateSettings', function(netId, expectedPlate, colour, pops)
     local src=source
-    if Config.SettingsPermission=='mechanic' and not isMechanic(src) then
-        return TriggerClientEvent('ox_lib:notify',src,{type='error',description='Only a mechanic can tune the anti-lag.'})
+    if saveLimited(src) then return end
+    local plate,current=editableVehicle(src,netId,expectedPlate)
+    if not plate then return end
+    if colour~=nil and not validColour(colour) then
+        return TriggerClientEvent('ox_lib:notify',src,{type='error',description='Invalid flame colour.'})
     end
-
-    local entity=NetworkGetEntityFromNetworkId(netId)
-    if entity==0 or not DoesEntityExist(entity) then return end
-    if GetPedInVehicleSeat(entity,-1)~=GetPlayerPed(src) then
-        return TriggerClientEvent('ox_lib:notify',src,{type='error',description='You must be in the driver seat.'})
-    end
-
-    local plate=cleanPlate(GetVehicleNumberPlateText(entity))
-    if plate=='' or plate~=cleanPlate(expectedPlate) then return end
-    local current=installed[plate]
-    if not current then return end
-
-    local newColour=current.colour
-    if colour~=nil then
-        newColour=validColour(colour)
-        if not newColour then
-            return TriggerClientEvent('ox_lib:notify',src,{type='error',description='Invalid flame colour.'})
-        end
-    end
-    local newPops=current.pops
-    if pops~=nil then newPops=pops==true end
-
-    MySQL.update.await('UPDATE sp_antilag SET flame_colour = ?, pops_bangs = ? WHERE plate = ?',
-        {newColour, newPops and 1 or 0, plate})
-    current.colour=newColour
-    current.pops=newPops
-    TriggerClientEvent('sp_antilag:setInstalled',-1,plate,current)
+    local updated=sanitize({colour=colour,pops=pops},current)
+    updated.hotbar=current.hotbar or {}
+    saveRow(plate,updated)
+    installed[plate]=updated
+    TriggerClientEvent('sp_antilag:setInstalled',-1,plate,updated)
     TriggerClientEvent('ox_lib:notify',src,{type='success',description='Anti-lag settings saved.'})
 end)
 
+-- What nearby players need to draw/hear a shot. `look` comes from the driver so unsaved
+-- test-mode colours show for everyone too; it is re-validated here.
+local function sanitizeLook(look, saved)
+    look=type(look)=='table' and look or {}
+    local fs=Config.FlameSize
+    return {
+        colour=validColour(look.colour) or saved.colour,
+        size=clamp(look.size,fs.Min,fs.Max,saved.size or fs.Default),
+        silent=bool(look.silent,saved.silent==true),
+        hide=bool(look.hide,saved.hideFlames==true),
+        sound=soundKeys[look.sound] and look.sound or saved.sound,
+        compat=bool(look.compat,saved.compat==true),
+    }
+end
+
 local rate={}
-RegisterNetEvent('sp_antilag:effect', function(netId, clientPlate, kind, withFlame)
+RegisterNetEvent('sp_antilag:effect', function(netId, clientPlate, kind, withFlame, look)
     local src=source
     if kind~='pop' and kind~='bang' and kind~='mega' and kind~='big' then return end
     local now=os.clock()
@@ -183,9 +286,25 @@ RegisterNetEvent('sp_antilag:effect', function(netId, clientPlate, kind, withFla
     if entity==0 or not DoesEntityExist(entity) then return end
     local serverPlate=cleanPlate(GetVehicleNumberPlateText(entity))
     if serverPlate~=plate then return end
-    TriggerClientEvent('sp_antilag:effect',-1,netId,kind,src,settings.colour,withFlame~=false)
+    TriggerClientEvent('sp_antilag:effect',-1,netId,kind,src,sanitizeLook(look,settings),withFlame~=false)
 end)
 
-AddEventHandler('playerDropped',function() rate[source]=nil end)
+AddEventHandler('playerDropped',function() rate[source]=nil; saveRate[source]=nil end)
+
+-- exports['sp_antilag']:SetSettings(plate, { colour = 'blue', intensity = 'max', ... })
+exports('SetSettings', function(plate, changes)
+    plate=cleanPlate(plate)
+    local current=installed[plate]
+    if not current or type(changes)~='table' then return false end
+    local updated=sanitize(changes,current)
+    updated.hotbar=current.hotbar or {}
+    saveRow(plate,updated)
+    installed[plate]=updated
+    TriggerClientEvent('sp_antilag:setInstalled',-1,plate,updated)
+    return true
+end)
+
+exports('GetSettings', function(plate) return installed[cleanPlate(plate)] or false end)
+
 
 print(('^2[sp_antilag] v%s loaded from %s^7'):format(GetResourceMetadata(GetCurrentResourceName(),'version',0) or '?',GetResourcePath(GetCurrentResourceName())))

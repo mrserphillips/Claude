@@ -1,174 +1,140 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>sp_antilag audio</title></head>
+<head>
+<meta charset="utf-8">
+<title>sp_antilag</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Exo+2:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
 <body>
-<script>
-// Synthesised exhaust pops / bangs. Nothing is prerecorded: every shot is built from
-// noise + a sub "thump" with slight randomisation so no two hits sound identical.
-let ctx = null, master = null, noise = null, shaper = null, hardShaper = null;
-const reverbs = {};
 
-function makeCurve(k) {
-    const n = 2048, curve = new Float32Array(n);
-    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curve[i] = Math.tanh(x * k); }
-    return curve;
-}
+<div id="panel" class="panel hidden">
+    <header class="panel-head" id="dragHandle">
+        <div class="title"><i class="fa-solid fa-bolt"></i><span id="title">SP ANTILAG - 2STEP</span></div>
+        <div class="head-actions">
+            <button class="icon-btn" id="centerBtn" title="Centre panel"><i class="fa-solid fa-crosshairs"></i></button>
+            <button class="close-dot" id="closeBtn" title="Close"></button>
+        </div>
+    </header>
 
-// Decaying-noise impulse = the echo of a bang bouncing off the street.
-function makeReverb(seconds) {
-    const len = Math.floor(ctx.sampleRate * seconds);
-    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-    for (let c = 0; c < 2; c++) {
-        const d = buf.getChannelData(c);
-        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-    }
-    const conv = ctx.createConvolver();
-    conv.buffer = buf;
-    conv.connect(master);
-    return conv;
-}
+    <nav class="tabs">
+        <button class="tab active" data-tab="twostep">ANTILAG - 2STEP</button>
+        <button class="tab" data-tab="launch" id="launchTab">LAUNCH CONTROL (2STEP)<i class="fa-solid fa-lock lock"></i></button>
+        <button class="tab" data-tab="colors">COLORS</button>
+        <button class="tab" data-tab="hotbar">HOTBAR</button>
+        <button class="tab" data-tab="misc">MISC</button>
+    </nav>
 
-function init(existing) {
-    if (ctx) return;
-    ctx = existing || new (window.AudioContext || window.webkitAudioContext)();
+    <main class="body">
+        <!-- 2STEP -->
+        <section class="page active" data-page="twostep">
+            <div class="twostep-grid">
+                <div class="info-card">
+                    <div><span>Vehicle:</span><b id="vName">-</b></div>
+                    <div><span>Plate:</span><b id="vPlate">-</b></div>
+                    <div><span>Fuel:</span><b id="vFuel">-</b></div>
+                    <div><span>Engine Health:</span><b id="vEngine">-</b></div>
+                    <div><span>Turbo:</span><b id="vTurbo">-</b></div>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">ANTILAG - 2STEP</h3>
+                    <label class="row-toggle">Activate Antilag - 2Step <input type="checkbox" data-bind="enabled"><span class="switch"></span></label>
+                    <label class="row-toggle">Activate Launch Control (2step) <input type="checkbox" data-bind="launch"><span class="switch"></span></label>
 
-    // Limiter only: catches clipping but leaves bangs much louder than pops.
-    master = ctx.createDynamicsCompressor();
-    master.threshold.value = -2; master.knee.value = 0; master.ratio.value = 20;
-    master.attack.value = 0.001; master.release.value = 0.1;
-    // Soft clipper after the limiter so stacked bangs never hard-clip.
-    const clip = ctx.createWaveShaper();
-    const n = 2048, c = new Float32Array(n), norm = Math.tanh(1.5);
-    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = Math.tanh(x * 1.5) / norm * 0.98; }
-    clip.curve = c;
-    master.connect(clip); clip.connect(ctx.destination);
+                    <h4 class="label"><i class="fa-solid fa-gauge-high"></i> Antilag Type</h4>
+                    <div class="select-wrap">
+                        <select id="soundSelect"></select>
+                        <i class="fa-solid fa-caret-down"></i>
+                    </div>
+                    <p class="hint" id="soundHint">Select to hear preview before saving</p>
 
-    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-    const d = noise.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                    <h4 class="label"><i class="fa-solid fa-signal"></i> Intensity</h4>
+                    <div class="seg" data-seg="intensity"></div>
+                </div>
+            </div>
+        </section>
 
-    shaper = makeCurve(4);
-    hardShaper = makeCurve(12);
-    reverbs.short = makeReverb(0.7);
-    reverbs.long = makeReverb(1.4);
-}
+        <!-- LAUNCH CONTROL -->
+        <section class="page" data-page="launch">
+            <div class="card">
+                <h3 class="card-title">LAUNCH CONTROL (2STEP)</h3>
+                <p class="hint">Hold <kbd>SPACE</kbd> + <kbd>W</kbd> while stopped. Revs are held at the limiter below and the 2-step fires. Release the handbrake to launch.</p>
+                <h4 class="label"><i class="fa-solid fa-gauge"></i> RPM Limiter <span class="value" id="rpmValue">70%</span></h4>
+                <input type="range" class="slider" id="rpmSlider" step="0.01">
+                <h4 class="label"><i class="fa-solid fa-signal"></i> Launch Intensity</h4>
+                <div class="seg" data-seg="launchIntensity"></div>
+            </div>
+        </section>
 
-const rnd = (a, b) => a + Math.random() * (b - a);
+        <!-- COLORS -->
+        <section class="page" data-page="colors">
+            <div class="card">
+                <h3 class="card-title"><i class="fa-solid fa-fill-drip"></i> FLAME COLORS</h3>
+                <p class="hint big">Select the flame color. Changes will only be applied after saving.</p>
+                <div class="sub-card">
+                    <div class="sub-head">
+                        <h4 class="label"><i class="fa-solid fa-droplet"></i> Flame Color</h4>
+                        <div class="sub-actions">
+                            <span class="colour-name" id="colourName">FIRE</span>
+                            <button class="pill" id="testBtn"><i class="fa-solid fa-fire"></i> TEST</button>
+                        </div>
+                    </div>
+                    <div class="swatches" id="swatches"></div>
+                </div>
+                <div class="sub-card">
+                    <h4 class="label"><i class="fa-solid fa-maximize"></i> Flame Size <span class="value" id="sizeValue">1.00x</span></h4>
+                    <input type="range" class="slider" id="sizeSlider" step="0.05">
+                </div>
+                <div class="sub-card">
+                    <h4 class="label"><i class="fa-solid fa-screwdriver-wrench"></i> Compatibility Mode</h4>
+                    <p class="hint">Select this if the colors are not coming out of your current exhaust.</p>
+                    <button class="pill toggle-pill" data-pill="compat"><i class="fa-solid fa-wrench"></i> COMPATIBLE</button>
+                </div>
+            </div>
+        </section>
 
-// crack = sharp bright front edge, body = the main report, boom = low thump, echo = tail.
-const KINDS = {
-    pop:  { crack: [0.30, 0.010, 2500], body: ['bandpass', [900, 1900], 0.9, 0.07, 0.45, false],
-            boom: [140, 60, 0.06, 0.35], echo: null },
-    bang: { crack: [1.60, 0.028, 700],  body: ['lowpass', [2800, 3800], 0.8, 0.20, 1.30, true],
-            boom: [120, 42, 0.26, 1.00], echo: ['short', 0.35] },
-    mega: { crack: [2.20, 0.040, 500],  body: ['lowpass', [3000, 4200], 0.7, 0.34, 1.60, true],
-            boom: [100, 32, 0.40, 1.20], echo: ['long', 0.45] },
-};
+        <!-- HOTBAR -->
+        <section class="page" data-page="hotbar">
+            <div class="card">
+                <h3 class="card-title"><i class="fa-solid fa-grip"></i> HOTBAR</h3>
+                <p class="hint big" id="hotbarHint">Quick preset switch. Save the current config to a preset slot below.</p>
+                <div id="presetRows"></div>
+                <div class="divider"></div>
+                <button class="btn-accent" id="repositionBtn"><i class="fa-solid fa-crosshairs"></i> <span>Reposition Hotbar</span></button>
+                <p class="hint">Click to show the hotbar, drag to reposition. Click Done when finished.</p>
+            </div>
+        </section>
 
-function envGain(t, peak, dur) {
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(peak, t + 0.0015);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    return g;
-}
+        <!-- MISC -->
+        <section class="page" data-page="misc">
+            <div class="card">
+                <h3 class="card-title"><i class="fa-solid fa-sliders"></i> MISC</h3>
+                <label class="row-toggle" id="popsRow">Pops &amp; Bangs <small>overrun crackle when you lift off</small><input type="checkbox" data-bind="pops"><span class="switch"></span></label>
+                <label class="row-toggle">Popcorn Mode <small>rapid-fire pops on the limiter</small><input type="checkbox" data-bind="popcorn"><span class="switch"></span></label>
+                <label class="row-toggle" id="gearRow">Gear Change Bangs <small>pop, pop, bang on every upshift</small><input type="checkbox" data-bind="gear"><span class="switch"></span></label>
+                <label class="row-toggle">Silent Mode <small>flames with no sound</small><input type="checkbox" data-bind="silent"><span class="switch"></span></label>
+                <label class="row-toggle">Hide Flames <small>sound with no fire</small><input type="checkbox" data-bind="hideFlames"><span class="switch"></span></label>
+            </div>
+        </section>
+    </main>
 
-function noiseBurst(t, dur, filterType, freq, q, curve, peak, dest) {
-    const src = ctx.createBufferSource();
-    src.buffer = noise;
-    const f = ctx.createBiquadFilter();
-    f.type = filterType; f.frequency.value = freq; f.Q.value = q;
-    const ws = ctx.createWaveShaper(); ws.curve = curve;
-    const g = envGain(t, peak, dur);
-    src.connect(f); f.connect(ws); ws.connect(g); g.connect(dest);
-    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
-}
+    <footer class="panel-foot">
+        <button class="btn-save" id="saveBtn"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
+        <button class="btn-reset" id="resetBtn"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+    </footer>
+</div>
 
-// BIG bang: a separate, much deeper explosion on top of the normal crackle sounds.
-// Hard crack, two overdriven tones dropping to 25Hz, a sub you feel, low rumble,
-// then the long street echo.
-function bigBang(volume, muffle, at) {
-    const t = at || ctx.currentTime + 0.005;
-    const scale = rnd(0.94, 1.06);
+<div id="testPrompt" class="test-prompt hidden">
+    <i class="fa-solid fa-fire"></i> Hold <kbd id="kHold">SPACE</kbd> + <kbd id="kGas">W</kbd> to test
+    <span class="sep"></span>
+    <kbd id="kExit">BACKSPACE</kbd> to exit
+</div>
 
-    const out = ctx.createBiquadFilter();
-    out.type = 'lowpass';
-    out.frequency.value = 600 + 17000 * Math.pow(1 - Math.min(Math.max(muffle, 0), 1), 2);
-    const vol = ctx.createGain();
-    vol.gain.value = volume;
-    out.connect(vol); vol.connect(master);
-    const wet = ctx.createGain();
-    wet.gain.value = 0.55;
-    vol.connect(wet); wet.connect(reverbs.long);
+<div id="hotbar" class="hotbar hidden"></div>
 
-    noiseBurst(t, 0.035, 'highpass', 400, 0.7, hardShaper, 2.6, out);   // crack
-    noiseBurst(t, 0.30 * scale, 'lowpass', 320, 0.9, hardShaper, 1.6, out); // low rumble
-
-    for (const detune of [1, 1.06]) {
-        const o = ctx.createOscillator(); o.type = 'triangle';
-        o.frequency.setValueAtTime(95 * scale * detune, t);
-        o.frequency.exponentialRampToValueAtTime(25, t + 0.35);
-        const pre = ctx.createGain(); pre.gain.value = 4;
-        const ws = ctx.createWaveShaper(); ws.curve = hardShaper;
-        const og = envGain(t, 1.5, 0.38 * scale);
-        o.connect(pre); pre.connect(ws); ws.connect(og); og.connect(out);
-        o.start(t); o.stop(t + 0.4 * scale);
-    }
-
-    const sub = ctx.createOscillator(); sub.type = 'sine';
-    sub.frequency.setValueAtTime(58, t);
-    sub.frequency.exponentialRampToValueAtTime(20, t + 0.6);
-    const sg = envGain(t, 1.6, 0.6);
-    sub.connect(sg); sg.connect(out);
-    sub.start(t); sub.stop(t + 0.62);
-}
-
-function shot(kind, volume, muffle, at) {
-    if (kind === 'big') return bigBang(volume, muffle, at);
-    const k = KINDS[kind] || KINDS.pop;
-    const t = at || ctx.currentTime + 0.005;
-    const scale = rnd(0.88, 1.12);
-    const hard = k.body[5];
-
-    // Distance muffling: further away = duller.
-    const out = ctx.createBiquadFilter();
-    out.type = 'lowpass';
-    out.frequency.value = 600 + 17000 * Math.pow(1 - Math.min(Math.max(muffle, 0), 1), 2);
-    const vol = ctx.createGain();
-    vol.gain.value = volume;
-    out.connect(vol); vol.connect(master);
-    if (k.echo) {
-        const wet = ctx.createGain();
-        wet.gain.value = k.echo[1];
-        vol.connect(wet); wet.connect(reverbs[k.echo[0]]);
-    }
-
-    const [cPeak, cDur, cHp] = k.crack;
-    noiseBurst(t, cDur, 'highpass', cHp, 0.7, hard ? hardShaper : shaper, cPeak, out);
-
-    const [bType, bF, bQ, bDur, bGain] = k.body;
-    noiseBurst(t, bDur * scale, bType, rnd(bF[0], bF[1]), bQ, hard ? hardShaper : shaper, bGain, out);
-
-    const [f0, f1, oDur, oGain] = k.boom;
-    const o = ctx.createOscillator();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(f0 * scale, t);
-    o.frequency.exponentialRampToValueAtTime(f1, t + oDur);
-    const og = envGain(t, oGain, oDur * scale);
-    o.connect(og); og.connect(out);
-    o.start(t); o.stop(t + oDur * scale + 0.02);
-
-    // Mega gets a second, slightly delayed report.
-    if (kind === 'mega' && !at) shot('bang', volume * 0.75, muffle, t + rnd(0.05, 0.09));
-}
-
-window.addEventListener('message', (e) => {
-    const m = e.data;
-    if (!m || m.action !== 'sp_antilag') return;
-    init();
-    if (ctx.state === 'suspended') ctx.resume();
-    shot(m.kind, Math.max(0, Math.min(m.volume || 0, 1.5)), m.muffle || 0);
-});
-</script>
+<script src="audio.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

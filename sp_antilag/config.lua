@@ -86,12 +86,12 @@ Config.PopsBangs = {
 ---------------------------------------------------------------------
 -- V4.4 FLAME COLOURS
 ---------------------------------------------------------------------
--- Who may change a fitted vehicle's flame colour / pops & bangs setting:
+-- Who may change a fitted vehicle's settings from the panel:
 --   'driver'   = whoever is in the driver seat of a fitted vehicle
 --   'mechanic' = only mechanics (Config.MechanicJobs) in the driver seat
 Config.SettingsPermission = 'driver'
 
--- Command that opens the settings menu (driver seat of a fitted vehicle).
+-- Command that opens the 2-Step panel (driver seat of a fitted vehicle).
 Config.MenuCommand = 'antilag'
 
 -- Allow picking any colour with the colour picker, not just the presets.
@@ -127,14 +127,111 @@ Config.FlameGlow = true
 Config.FlameGlowRange = 3.0       -- metres
 Config.FlameGlowIntensity = 8.0
 
+-- 30 colours for the panel swatch grid. Keep the keys stable: they are what is saved per plate.
 Config.FlameColours = {
-    { key = 'stock',   label = 'Stock (orange)', rgb = nil },
-    { key = 'blue',    label = 'Blue',           rgb = { 40, 120, 255 } },
-    { key = 'cyan',    label = 'Cyan',           rgb = { 0, 230, 255 } },
-    { key = 'green',   label = 'Green',          rgb = { 40, 255, 60 } },
-    { key = 'purple',  label = 'Purple',         rgb = { 170, 60, 255 } },
-    { key = 'pink',    label = 'Pink',           rgb = { 255, 50, 190 } },
-    { key = 'red',     label = 'Red',            rgb = { 255, 25, 25 } },
-    { key = 'white',   label = 'White hot',      rgb = { 255, 255, 255 } },
-    { key = 'rainbow', label = 'Rainbow',        rgb = 'rainbow' },
+    { key = 'stock',    label = 'Fire',        rgb = nil },
+    { key = 'rainbow',  label = 'Rainbow',     rgb = 'rainbow' },
+    { key = 'white',    label = 'White hot',   rgb = { 255, 255, 255 } },
+    { key = 'blue',     label = 'Blue',        rgb = { 40, 120, 255 } },
+    { key = 'cyan',     label = 'Cyan',        rgb = { 0, 230, 255 } },
+    { key = 'sky',      label = 'Sky',         rgb = { 120, 200, 255 } },
+    { key = 'navy',     label = 'Navy',        rgb = { 30, 60, 200 } },
+    { key = 'indigo',   label = 'Indigo',      rgb = { 90, 80, 240 } },
+    { key = 'violet',   label = 'Violet',      rgb = { 140, 0, 255 } },
+    { key = 'purple',   label = 'Purple',      rgb = { 170, 60, 255 } },
+    { key = 'lavender', label = 'Lavender',    rgb = { 190, 140, 255 } },
+    { key = 'magenta',  label = 'Magenta',     rgb = { 255, 0, 255 } },
+    { key = 'pink',     label = 'Pink',        rgb = { 255, 50, 190 } },
+    { key = 'rose',     label = 'Rose',        rgb = { 255, 0, 110 } },
+    { key = 'red',      label = 'Red',         rgb = { 255, 25, 25 } },
+    { key = 'crimson',  label = 'Crimson',     rgb = { 220, 20, 60 } },
+    { key = 'orange',   label = 'Orange',      rgb = { 255, 120, 0 } },
+    { key = 'amber',    label = 'Amber',       rgb = { 255, 180, 0 } },
+    { key = 'gold',     label = 'Gold',        rgb = { 230, 190, 50 } },
+    { key = 'yellow',   label = 'Yellow',      rgb = { 255, 235, 40 } },
+    { key = 'lime',     label = 'Lime',        rgb = { 170, 255, 0 } },
+    { key = 'green',    label = 'Green',       rgb = { 40, 255, 60 } },
+    { key = 'mint',     label = 'Mint',        rgb = { 140, 255, 170 } },
+    { key = 'emerald',  label = 'Emerald',     rgb = { 0, 200, 110 } },
+    { key = 'teal',     label = 'Teal',        rgb = { 0, 190, 170 } },
+    { key = 'aqua',     label = 'Aqua',        rgb = { 60, 255, 220 } },
+    { key = 'peach',    label = 'Peach',       rgb = { 255, 200, 160 } },
+    { key = 'bronze',   label = 'Bronze',      rgb = { 205, 127, 50 } },
+    { key = 'silver',   label = 'Silver',      rgb = { 190, 200, 215 } },
+    { key = 'plum',     label = 'Plum',        rgb = { 170, 70, 130 } },
+}
+
+---------------------------------------------------------------------
+-- V5.0 2-STEP PANEL
+---------------------------------------------------------------------
+Config.UI = {
+    Title = 'SP ANTILAG - 2STEP',
+    Accent = '#2F8CFF',      -- main blue
+    AccentGlow = '#5FB0FF',  -- lighter blue for glows / hovers
+}
+
+-- Compatibility mode (per vehicle): some exhausts will not show the normal colour effect.
+-- Ticking "Compatible" in the panel uses this Config.ColourFxOptions entry instead.
+Config.CompatColourFx = 8
+
+-- Exhaust sound types, picked in the panel (synth sound mode only). Selecting one plays a preview.
+--   pitch = frequency multiplier, length = decay multiplier, crack = sharpness of the front edge
+Config.SoundTypes = {
+    { key = 'classic', label = 'Antilag 1 - Classic', pitch = 1.00, length = 1.00, crack = 1.00 },
+    { key = 'deep',    label = 'Antilag 2 - Deep',    pitch = 0.72, length = 1.30, crack = 0.80 },
+    { key = 'sharp',   label = 'Antilag 3 - Sharp',   pitch = 1.35, length = 0.75, crack = 1.40 },
+    { key = 'rally',   label = 'Antilag 4 - Rally',   pitch = 1.10, length = 0.90, crack = 1.25 },
+    { key = 'drift',   label = 'Antilag 5 - Drift',   pitch = 0.90, length = 1.15, crack = 1.10 },
+    { key = 'thunder', label = 'Antilag 6 - Thunder', pitch = 0.60, length = 1.55, crack = 0.90 },
+    { key = 'race',    label = 'Antilag 7 - Race',    pitch = 1.20, length = 0.65, crack = 1.60 },
+    { key = 'muscle',  label = 'Antilag 8 - Muscle',  pitch = 0.80, length = 1.20, crack = 1.00 },
+}
+
+-- Intensity levels. cooldown multiplies Config.LimiterCooldownMs, flame multiplies the
+-- flame size, chance = chance a limiter burst fires at all, maxSpeed = 2-step speed window.
+Config.Intensity = {
+    soft = {
+        label = 'Soft', cooldown = 1.6, flame = 0.80, chance = 0.75, maxSpeed = 8.0,
+        sequence = { { 'pop', 95 }, { 'pop', 95 }, { 'bang', 0 } }
+    },
+    moderate = {
+        label = 'Moderate', cooldown = 1.0, flame = 1.00, chance = 1.0, maxSpeed = 12.0,
+        sequence = nil -- nil = Config.LimiterSequence
+    },
+    max = {
+        label = 'Maximum', cooldown = 0.7, flame = 1.25, chance = 1.0, maxSpeed = 16.0,
+        sequence = { { 'bang', 85 }, { 'pop', 80 }, { 'mega', 110 }, { 'bang', 90 }, { 'mega', 220 }, { 'big', 0 } }
+    },
+}
+
+-- Launch control: hold the handbrake + throttle while stopped. RPM is held at the limiter
+-- set in the panel and the 2-step fires at the launch intensity. Release the handbrake to go.
+Config.LaunchControl = {
+    HoldControl = 76,        -- 76 = handbrake (SPACE / RB)
+    MinRpm = 0.45,           -- lowest limiter the panel allows (0.0 - 1.0 of redline)
+    MaxRpm = 0.95,
+    DefaultRpm = 0.70,
+}
+
+-- Popcorn mode: while on the limiter, a chance of a rapid-fire string of pops.
+Config.Popcorn = {
+    Chance = 0.35,
+    CooldownMs = 2200,
+    Shots = { 6, 10 },       -- min, max pops in a string
+    GapMs = { 75, 110 },     -- min, max gap between them
+}
+
+-- Flame size slider range in the panel (multiplier on every flame).
+Config.FlameSize = { Min = 0.5, Max = 2.0, Default = 1.0 }
+
+-- Hotbar: three presets per vehicle. Press the key while driving to open it, then 1 / 2 / 3.
+Config.Hotbar = {
+    Enabled = true,
+    Key = 'N',               -- default keybind (players can rebind in GTA settings > FiveM)
+}
+
+-- Test mode (Colors tab > TEST): the car is frozen, hold handbrake + throttle to rev and see
+-- the unsaved flame. Backspace ends it.
+Config.TestMode = {
+    CooldownMs = 650,
 }

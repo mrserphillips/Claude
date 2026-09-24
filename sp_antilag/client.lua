@@ -149,12 +149,6 @@ local function resolveColour(colour)
     return nil
 end
 
-local function colourLabel(colour)
-    local preset=presetByKey[colour]
-    if preset then return preset.label end
-    return colour or 'Stock'
-end
-
 local function loadPtfx(asset)
     asset=asset or 'core'
     if HasNamedPtfxAssetLoaded(asset) then return true end
@@ -163,6 +157,11 @@ local function loadPtfx(asset)
     while not HasNamedPtfxAssetLoaded(asset) and GetGameTimer()<untilTime do Wait(0) end
     return HasNamedPtfxAssetLoaded(asset)
 end
+
+local loadedBanks={}
+
+local soundByKey={}
+for _,t in ipairs(Config.SoundTypes) do soundByKey[t.key]=t end
 
 local function nativeSound(vehicle,kind)
     local s=Config.NativeSounds[kind] or Config.NativeSounds.pop
@@ -176,20 +175,25 @@ end
 
 -- V4.4.2: synthesised pops/bangs through NUI (html/index.html), volume and
 -- muffling by distance from the camera.
-local function synthSound(vehicle,kind)
+local function synthSound(vehicle,kind,soundKey)
     local dist=#(GetFinalRenderedCamCoord()-GetEntityCoords(vehicle))
     if dist>Config.SoundRange then return end
     local f=dist/Config.SoundRange
+    local prof=soundByKey[soundKey] or Config.SoundTypes[1]
     SendNUIMessage({
         action='sp_antilag',
         kind=kind,
         volume=Config.SoundVolume*(1.0-f)^2,
-        muffle=f
+        muffle=f,
+        profile={pitch=prof.pitch,length=prof.length,crack=prof.crack}
     })
 end
 
-local function playSound(vehicle,kind)
-    if Config.SoundMode=='native' then nativeSound(vehicle,kind) else synthSound(vehicle,kind) end
+-- look = { colour, size, silent, hide, sound, compat } (see lookOf)
+local function playSound(vehicle,kind,look)
+    look=look or {}
+    if look.silent then return end
+    if Config.SoundMode=='native' then nativeSound(vehicle,kind) else synthSound(vehicle,kind,look.sound) end
     if kind=='big' and Config.BigBang.Shake>0 then
         local dist=#(GetEntityCoords(PlayerPedId())-GetEntityCoords(vehicle))
         if dist<Config.BigBang.ShakeRange then
@@ -266,8 +270,10 @@ local function flameLevel(kind)
 end
 
 local lastFlameByVehicle={}
-local function flame(vehicle,big,colour,fx)
+local function flame(vehicle,big,look,fx,sizeMul)
     if not DoesEntityExist(vehicle) then return end
+    look=look or {}
+    if look.hide then return end
 
     -- Hard local safety gate: no vehicle can create visual PTFX faster than this.
     -- This is deliberately client-side and silent.
@@ -279,7 +285,9 @@ local function flame(vehicle,big,colour,fx)
 
     if not loadPtfx() then return end
     local scale=(big=='huge' and Config.HugeFlameScale) or (big and Config.BigFlameScale) or Config.FlameScale
-    local r,g,b=resolveColour(colour)
+    scale=scale*(look.size or 1.0)*(sizeMul or 1.0)
+    if not fx and look.compat then fx=Config.ColourFxOptions[Config.CompatColourFx] end
+    local r,g,b=resolveColour(look.colour)
     local heading=GetEntityHeading(vehicle)
     local points={}
     for _,name in ipairs(exhaustNames) do
@@ -292,33 +300,61 @@ local function flame(vehicle,big,colour,fx)
     glow(points,r,g,b,big)
 end
 
-RegisterNetEvent('sp_antilag:effect',function(netId,kind,sourceServerId,colour,withFlame)
+-- What a shot looks and sounds like, from saved settings (or the unsaved test draft).
+local function lookOf(s)
+    return {
+        colour=s.colour,
+        size=s.size or 1.0,
+        silent=s.silent==true,
+        hide=s.hideFlames==true,
+        sound=s.sound,
+        compat=s.compat==true
+    }
+end
+
+RegisterNetEvent('sp_antilag:effect',function(netId,kind,sourceServerId,look,withFlame)
     if sourceServerId==GetPlayerServerId(PlayerId()) then return end
     local vehicle=NetToVeh(netId)
     if vehicle==0 or not DoesEntityExist(vehicle) then return end
     if #(GetEntityCoords(PlayerPedId())-GetEntityCoords(vehicle))>Config.Range then return end
-    playSound(vehicle,kind)
-    if withFlame~=false then flame(vehicle,flameLevel(kind),colour) end
+    if type(look)~='table' then look={colour=look} end
+    playSound(vehicle,kind,look)
+    if withFlame~=false then flame(vehicle,flameLevel(kind),look) end
 end)
 
-local function send(vehicle,kind,withFlame)
+local testing=nil -- { vehicle, draft } while the panel's test mode runs
+
+local function send(vehicle,kind,withFlame,look,sizeMul)
     if withFlame==nil then withFlame=true end
-    local settings=settingsOf(vehicle)
-    playSound(vehicle,kind)
-    if withFlame then flame(vehicle,flameLevel(kind),settings and settings.colour) end
-    TriggerServerEvent('sp_antilag:effect',VehToNet(vehicle),plateOf(vehicle),kind,withFlame)
+    look=look or lookOf(settingsOf(vehicle) or {})
+    playSound(vehicle,kind,look)
+    if withFlame then flame(vehicle,flameLevel(kind),look,nil,sizeMul) end
+    TriggerServerEvent('sp_antilag:effect',VehToNet(vehicle),plateOf(vehicle),kind,withFlame,look)
 end
 
--- Bursts follow Config.LimiterSequence / Config.LiftSequence: { kind, gap-after-ms }.
-local function burst(vehicle,sequence)
+-- Bursts follow a sequence of { kind, gap-after-ms }.
+local function burst(vehicle,sequence,look,sizeMul)
     for i,step in ipairs(sequence) do
-        send(vehicle,step[1])
+        send(vehicle,step[1],true,look,sizeMul)
         if i<#sequence then Wait(step[2] or 90) end
     end
 end
 
-local function limiterBurst(vehicle) burst(vehicle,Config.LimiterSequence) end
+local function intensityOf(key)
+    local it=Config.Intensity[key] or Config.Intensity.moderate
+    return it,(it.sequence or Config.LimiterSequence)
+end
+
 local function liftBurst(vehicle) burst(vehicle,Config.LiftSequence) end
+
+-- Popcorn: rapid string of pops.
+local function popcorn(vehicle,look)
+    local pc=Config.Popcorn
+    for _=1,math.random(pc.Shots[1],pc.Shots[2]) do
+        send(vehicle,'pop',true,look)
+        Wait(math.random(pc.GapMs[1],pc.GapMs[2]))
+    end
+end
 
 -- V4.4 pops & bangs: one irregular overrun shot.
 local function crackleShot(vehicle)
@@ -339,6 +375,7 @@ local lastThrottle=0.0
 local limiterSince=nil
 local lastLimiter=0
 local lastLift=0
+local lastPopcorn=0
 local activePlate=nil
 local overrunSince=nil
 local finaleDone=false
@@ -351,13 +388,29 @@ local function resetState()
     limiterSince=nil; lastThrottle=0.0; activePlate=nil; overrunSince=nil; lastGear=nil
 end
 
+-- One 2-step hit on the limiter at the given intensity (popcorn may replace it).
+local function limiterHit(vehicle,settings,intensityKey,look)
+    local it,sequence=intensityOf(intensityKey)
+    local now=GetGameTimer()
+    if settings.popcorn and now-lastPopcorn>=Config.Popcorn.CooldownMs and math.random()<Config.Popcorn.Chance then
+        lastPopcorn=now
+        CreateThread(function() popcorn(vehicle,look) end)
+        return
+    end
+    if math.random()>it.chance then return end
+    CreateThread(function() burst(vehicle,sequence,look,it.flame) end)
+end
+
 CreateThread(function()
     while true do
         local sleep=350
         local ped=PlayerPedId()
-        if IsPedInAnyVehicle(ped,false) then
+        if testing then
+            sleep=500
+        elseif IsPedInAnyVehicle(ped,false) then
             local vehicle=GetVehiclePedIsIn(ped,false)
-            if vehicle~=0 and GetPedInVehicleSeat(vehicle,-1)==ped and installed(vehicle) then
+            local settings=vehicle~=0 and GetPedInVehicleSeat(vehicle,-1)==ped and settingsOf(vehicle)
+            if settings and settings.enabled~=false then
                 sleep=20
                 local plate=plateOf(vehicle)
                 if activePlate~=plate then
@@ -368,15 +421,32 @@ CreateThread(function()
                 local throttle=GetControlNormal(0,71)
                 local speed=GetEntitySpeed(vehicle)*3.6
                 local now=GetGameTimer()
+                local lc=Config.LaunchControl
+                local launching=settings.launch and speed<3.0 and throttle>=Config.LimiterThrottle
+                    and IsControlPressed(0,lc.HoldControl)
 
-                if speed<12.0 and throttle>=Config.LimiterThrottle then
+                if launching then
+                    -- Launch control: hold the revs at the panel's limiter every frame.
+                    sleep=0
+                    local cap=settings.launchRpm or lc.DefaultRpm
+                    if GetVehicleCurrentRpm(vehicle)>cap then SetVehicleCurrentRpm(vehicle,cap) end
                     limiterSince=limiterSince or now
-                    if now-limiterSince>=Config.LimiterHoldMs and now-lastLimiter>=Config.LimiterCooldownMs then
+                    local it=intensityOf(settings.launchIntensity)
+                    if now-limiterSince>=Config.LimiterHoldMs and now-lastLimiter>=Config.LimiterCooldownMs*it.cooldown then
                         lastLimiter=now
-                        CreateThread(function() limiterBurst(vehicle) end)
+                        limiterHit(vehicle,settings,settings.launchIntensity,lookOf(settings))
                     end
                 else
-                    limiterSince=nil
+                    local it=intensityOf(settings.intensity)
+                    if speed<it.maxSpeed and throttle>=Config.LimiterThrottle then
+                        limiterSince=limiterSince or now
+                        if now-limiterSince>=Config.LimiterHoldMs and now-lastLimiter>=Config.LimiterCooldownMs*it.cooldown then
+                            lastLimiter=now
+                            limiterHit(vehicle,settings,settings.intensity,lookOf(settings))
+                        end
+                    else
+                        limiterSince=nil
+                    end
                 end
 
                 if speed>=Config.MinSpeedKmh
@@ -389,8 +459,7 @@ CreateThread(function()
 
                 -- Pops & bangs: keeps crackling on the overrun after the lift burst.
                 local pb=Config.PopsBangs
-                local settings=settingsOf(vehicle)
-                if pb.Enabled and settings and settings.pops
+                if pb.Enabled and settings.pops
                 and speed>=pb.MinSpeedKmh and throttle<=pb.MaxThrottle then
                     -- Only starts from a real lift-off, not from rolling with no input.
                     if not overrunSince and lastThrottle>pb.MaxThrottle then
@@ -414,7 +483,7 @@ CreateThread(function()
                 -- Gear change: fire Config.GearChange.Sequence on each shift.
                 local gc=Config.GearChange
                 local gear=GetVehicleCurrentGear(vehicle)
-                if gc.Enabled and lastGear and gear~=lastGear and gear>0 and lastGear>0
+                if gc.Enabled and settings.gear~=false and lastGear and gear~=lastGear and gear>0 and lastGear>0
                 and (gear>lastGear or gc.Downshifts)
                 and speed>=gc.MinSpeedKmh and now-lastGearShot>=gc.CooldownMs then
                     lastGearShot=now
@@ -434,8 +503,11 @@ CreateThread(function()
 end)
 
 ---------------------------------------------------------------------
--- V4.4 settings menu: flame colour + pops & bangs toggle
+-- V5.0 2-STEP PANEL (NUI)
 ---------------------------------------------------------------------
+local panelOpen=false
+local panelVehicle=0
+
 local function settingsVehicle()
     local vehicle,reason=currentInstallVehicle()
     if vehicle==0 then return 0,(reason:gsub('to install anti%-lag','to tune the anti-lag')) end
@@ -444,70 +516,230 @@ local function settingsVehicle()
     return vehicle
 end
 
-local function pushSettings(vehicle,colour,pops)
-    TriggerServerEvent('sp_antilag:updateSettings',VehToNet(vehicle),plateOf(vehicle),colour,pops)
+local function hexOf(c)
+    if type(c.rgb)=='table' then return ('#%02X%02X%02X'):format(c.rgb[1],c.rgb[2],c.rgb[3]) end
+    if c.rgb=='rainbow' then return 'rainbow' end
+    return '#FF6A1A'
 end
 
-local openMenu
-
-local function openColourMenu(vehicle)
-    local settings=settingsOf(vehicle) or {}
-    local options={}
-    for _,c in ipairs(Config.FlameColours) do
-        local swatch
-        if type(c.rgb)=='table' then swatch=('#%02X%02X%02X'):format(c.rgb[1],c.rgb[2],c.rgb[3]) end
-        options[#options+1]={
-            title=c.label,
-            icon=c.key=='rainbow' and 'rainbow' or 'fire',
-            iconColor=swatch or (c.key=='stock' and '#FF8C1A' or nil),
-            description=settings.colour==c.key and 'Current' or nil,
-            onSelect=function() pushSettings(vehicle,c.key,nil) end
-        }
+local function uiConfig()
+    local colours={}
+    for _,c in ipairs(Config.FlameColours) do colours[#colours+1]={key=c.key,label=c.label,hex=hexOf(c)} end
+    local sounds={}
+    for _,t in ipairs(Config.SoundTypes) do sounds[#sounds+1]={key=t.key,label=t.label,pitch=t.pitch,length=t.length,crack=t.crack} end
+    local intensity={}
+    for _,k in ipairs({'soft','moderate','max'}) do
+        if Config.Intensity[k] then intensity[#intensity+1]={key=k,label=Config.Intensity[k].label} end
     end
-    if Config.AllowCustomColour then
-        options[#options+1]={
-            title='Custom colour...',
-            icon='palette',
-            description=(settings.colour and settings.colour:sub(1,1)=='#') and ('Current: '..settings.colour) or 'Pick any colour',
-            onSelect=function()
-                local input=lib.inputDialog('Custom flame colour',{
-                    { type='color', label='Flame colour', format='hex', required=true,
-                      default=(settings.colour and settings.colour:sub(1,1)=='#') and settings.colour or '#2878FF' }
-                })
-                if input and input[1] then pushSettings(vehicle,input[1],nil) end
-            end
-        }
-    end
-    lib.registerContext({ id='sp_antilag_colours', title='Flame colour', menu='sp_antilag_menu', options=options })
-    lib.showContext('sp_antilag_colours')
+    return {
+        ui=Config.UI,
+        colours=colours,
+        sounds=sounds,
+        intensity=intensity,
+        launch={min=Config.LaunchControl.MinRpm,max=Config.LaunchControl.MaxRpm},
+        size=Config.FlameSize,
+        popsEnabled=Config.PopsBangs.Enabled,
+        gearEnabled=Config.GearChange.Enabled,
+        hotbarKey=Config.Hotbar.Enabled and Config.Hotbar.Key or nil,
+        volume=Config.SoundVolume,
+        synth=Config.SoundMode~='native',
+    }
 end
 
-openMenu=function()
+local function vehicleInfo(vehicle)
+    local model=GetEntityModel(vehicle)
+    local label=GetLabelText(GetDisplayNameFromVehicleModel(model))
+    if label=='NULL' then label=GetDisplayNameFromVehicleModel(model) end
+    local fuel=Entity(vehicle).state.fuel or GetVehicleFuelLevel(vehicle)
+    return {
+        name=label,
+        plate=plateOf(vehicle),
+        fuel=math.floor((fuel or 0)+0.5),
+        engine=math.floor(math.max(0,math.min(1000,GetVehicleEngineHealth(vehicle)))/10+0.5),
+        turbo=IsToggleModOn(vehicle,18)
+    }
+end
+
+local function copySettings(s)
+    local out={}
+    for k,v in pairs(s) do if k~='hotbar' then out[k]=v end end
+    return out
+end
+
+local endTest
+
+local function closePanel()
+    if testing then endTest() end
+    panelOpen=false
+    panelVehicle=0
+    SetNuiFocus(false,false)
+    SendNUIMessage({action='close'})
+end
+
+local function openMenu()
+    if panelOpen then return end
     local vehicle,reason=settingsVehicle()
     if vehicle==0 then return lib.notify({type='error',description=reason}) end
     local settings=settingsOf(vehicle) or {}
-    local options={
-        {
-            title='Flame colour',
-            description='Current: '..colourLabel(settings.colour),
-            icon='fire',
-            arrow=true,
-            onSelect=function() openColourMenu(vehicle) end
-        }
-    }
-    if Config.PopsBangs.Enabled then
-        options[#options+1]={
-            title='Pops & bangs: '..(settings.pops and 'ON' or 'OFF'),
-            description='Overrun crackle while coasting off throttle',
-            icon=settings.pops and 'toggle-on' or 'toggle-off',
-            onSelect=function() pushSettings(vehicle,nil,not settings.pops) end
-        }
-    end
-    lib.registerContext({ id='sp_antilag_menu', title='Anti-lag ('..plateOf(vehicle)..')', options=options })
-    lib.showContext('sp_antilag_menu')
+    local hotbar={}
+    for i=1,3 do hotbar[i]=settings.hotbar and settings.hotbar[i] or false end
+    panelOpen=true
+    panelVehicle=vehicle
+    SetNuiFocus(true,true)
+    SendNUIMessage({
+        action='open',
+        config=uiConfig(),
+        settings=copySettings(settings),
+        hotbar=hotbar,
+        vehicle=vehicleInfo(vehicle)
+    })
 end
 
+-- Closes the panel if the player leaves the driver seat.
+CreateThread(function()
+    while true do
+        Wait(500)
+        if panelOpen then
+            local ped=PlayerPedId()
+            if not DoesEntityExist(panelVehicle) or GetVehiclePedIsIn(ped,false)~=panelVehicle
+            or GetPedInVehicleSeat(panelVehicle,-1)~=ped then
+                closePanel()
+            end
+        end
+    end
+end)
+
+RegisterNUICallback('close',function(_,cb) closePanel(); cb(1) end)
+
+RegisterNUICallback('save',function(data,cb)
+    cb(1)
+    if not panelOpen or type(data)~='table' or type(data.settings)~='table' then return end
+    local changes=copySettings(data.settings)
+    if type(data.hotbar)=='table' then
+        local hb={}
+        for i=1,3 do if type(data.hotbar[i])=='table' then hb[i]=copySettings(data.hotbar[i]) end end
+        changes.hotbar=hb
+    end
+    TriggerServerEvent('sp_antilag:saveSettings',VehToNet(panelVehicle),plateOf(panelVehicle),changes,data.message)
+end)
+
+-- Test mode: freeze the car, rev with handbrake + throttle, the unsaved draft is used.
+local function testLoop()
+    local lastShot=0
+    local device=nil
+    while testing do
+        local vehicle=testing.vehicle
+        if not DoesEntityExist(vehicle) then break end
+        DisableControlAction(0,1,true); DisableControlAction(0,2,true)
+        DisableControlAction(0,24,true); DisableControlAction(0,25,true)
+        DisableControlAction(0,200,true); DisableControlAction(0,199,true)
+        DisableControlAction(0,75,true) -- leave vehicle
+        local kb=IsUsingKeyboard(2)
+        if kb~=device then
+            device=kb
+            SendNUIMessage({action='testDevice',keyboard=kb})
+        end
+        if IsDisabledControlJustPressed(0,194) or IsControlJustPressed(0,194) then break end
+
+        local throttle=GetControlNormal(0,71)
+        local now=GetGameTimer()
+        if throttle>=Config.LimiterThrottle and IsControlPressed(0,Config.LaunchControl.HoldControl)
+        and now-lastShot>=Config.TestMode.CooldownMs then
+            lastShot=now
+            local draft=testing.draft
+            local it,sequence=intensityOf(draft.intensity)
+            CreateThread(function() burst(vehicle,sequence,lookOf(draft),it.flame) end)
+        end
+        Wait(0)
+    end
+    if testing then endTest() end
+end
+
+endTest=function()
+    if not testing then return end
+    local vehicle=testing.vehicle
+    testing=nil
+    if DoesEntityExist(vehicle) then FreezeEntityPosition(vehicle,false) end
+    SetNuiFocusKeepInput(false)
+    SendNUIMessage({action='testEnded'})
+end
+
+RegisterNUICallback('startTest',function(data,cb)
+    cb(1)
+    if not panelOpen or testing or type(data)~='table' or type(data.draft)~='table' then return end
+    testing={vehicle=panelVehicle,draft=data.draft}
+    FreezeEntityPosition(panelVehicle,true)
+    SetNuiFocusKeepInput(true)
+    CreateThread(testLoop)
+end)
+
+RegisterNUICallback('updateTest',function(data,cb)
+    cb(1)
+    if testing and type(data)=='table' and type(data.draft)=='table' then testing.draft=data.draft end
+end)
+
+RegisterNUICallback('endTest',function(_,cb) cb(1); endTest() end)
+
+AddEventHandler('onResourceStop',function(res)
+    if res~=GetCurrentResourceName() then return end
+    if testing and DoesEntityExist(testing.vehicle) then FreezeEntityPosition(testing.vehicle,false) end
+    if panelOpen then SetNuiFocus(false,false); SetNuiFocusKeepInput(false) end
+end)
+
 RegisterCommand(Config.MenuCommand,function() openMenu() end,false)
+exports('OpenMenu',openMenu)
+
+---------------------------------------------------------------------
+-- V5.0 HOTBAR: three presets per vehicle, swapped without the panel
+---------------------------------------------------------------------
+local hotbarOpen=false
+
+local function applyPreset(vehicle,i)
+    local settings=settingsOf(vehicle)
+    local preset=settings and settings.hotbar and settings.hotbar[i]
+    if not preset then return lib.notify({type='error',description=('Preset %d is empty. Save one from the Hotbar tab.'):format(i)}) end
+    TriggerServerEvent('sp_antilag:saveSettings',VehToNet(vehicle),plateOf(vehicle),copySettings(preset),('Preset %d loaded.'):format(i))
+end
+
+local function hotbarSummary(s)
+    if not s then return false end
+    return {colour=s.colour,intensity=s.intensity,sound=s.sound,launch=s.launch}
+end
+
+local function openHotbar()
+    if hotbarOpen or panelOpen then return end
+    local vehicle,reason=settingsVehicle()
+    if vehicle==0 then return lib.notify({type='error',description=reason}) end
+    local settings=settingsOf(vehicle) or {}
+    local presets={}
+    for i=1,3 do presets[i]=hotbarSummary(settings.hotbar and settings.hotbar[i]) end
+    hotbarOpen=true
+    SendNUIMessage({action='hotbar',show=true,presets=presets,config=uiConfig()})
+    CreateThread(function()
+        local untilTime=GetGameTimer()+6000
+        local keys={157,158,160} -- 1, 2, 3
+        while hotbarOpen and GetGameTimer()<untilTime do
+            for i,c in ipairs(keys) do
+                DisableControlAction(0,c,true)
+                if IsDisabledControlJustPressed(0,c) then
+                    applyPreset(vehicle,i)
+                    SendNUIMessage({action='hotbarPick',slot=i})
+                    untilTime=GetGameTimer()+500
+                end
+            end
+            Wait(0)
+        end
+        hotbarOpen=false
+        SendNUIMessage({action='hotbar',show=false})
+    end)
+end
+
+if Config.Hotbar.Enabled then
+    RegisterCommand('sp_antilag_hotbar',function()
+        if hotbarOpen then hotbarOpen=false else openHotbar() end
+    end,false)
+    RegisterKeyMapping('sp_antilag_hotbar','Anti-lag hotbar presets','keyboard',Config.Hotbar.Key)
+end
 
 -- /antilagtest: plays pop, pop, bang, pop, mega, BIG locally so you can check the sound works.
 RegisterCommand('antilagtest',function()
@@ -516,8 +748,9 @@ RegisterCommand('antilagtest',function()
     local target=vehicle~=0 and vehicle or ped
     CreateThread(function()
         for _,kind in ipairs({'pop','pop','bang','pop','mega','big'}) do
-            playSound(target,kind)
-            if vehicle~=0 then flame(vehicle,flameLevel(kind),(settingsOf(vehicle) or {}).colour) end
+            local look=vehicle~=0 and lookOf(settingsOf(vehicle) or {}) or {}
+            playSound(target,kind,look)
+            if vehicle~=0 then flame(vehicle,flameLevel(kind),look) end
             Wait(kind=='pop' and 110 or kind=='big' and 1200 or 450)
         end
     end)
@@ -542,7 +775,7 @@ RegisterCommand('antilagfx',function(_,args)
                 lib.notify({description=('Flame FX %d: %s (red, green, blue)'):format(i,fx.label or fx.name),duration=3500})
                 for n=1,3 do
                     lastFlameByVehicle={}
-                    flame(vehicle,true,testColours[n],fx)
+                    flame(vehicle,true,{colour=testColours[n]},fx)
                     playSound(vehicle,'pop')
                     Wait(700)
                 end
