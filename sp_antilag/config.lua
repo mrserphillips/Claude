@@ -31,6 +31,15 @@ Config.LiftThrottleBefore = 0.55
 Config.LiftThrottleAfter = 0.08
 Config.LiftCooldownMs = 520
 
+-- Burst patterns: { kind, gap after this shot in ms }. kind = 'pop' | 'bang' | 'mega'.
+-- Keep gaps >= 75ms so nearby players receive every shot (server rate gate is 70ms).
+Config.LimiterSequence = {      -- held throttle, stationary
+    { 'pop', 85 }, { 'bang', 110 }, { 'pop', 85 }, { 'mega', 0 }
+}
+Config.LiftSequence = {         -- lift off at speed
+    { 'bang', 100 }, { 'pop', 90 }, { 'mega', 0 }
+}
+
 Config.FlameScale = 1.55
 Config.BigFlameScale = 2.15
 
@@ -49,8 +58,8 @@ Config.PopsBangs = {
     MaxDurationMs = 4500,    -- stop crackling after this long on the overrun
     MinGapMs = 90,           -- shortest gap between pops (server rate gate is 70ms)
     MaxGapMs = 260,          -- longest gap between pops
-    BangChance = 0.14,       -- chance any shot is a bang instead of a pop
-    MegaChance = 0.03,       -- chance any shot is a mega bang
+    BangChance = 0.30,       -- chance any shot is a bang instead of a pop
+    MegaChance = 0.15,       -- chance any shot is a mega bang
     FlameChance = 0.55,      -- chance a plain pop also spits a flame (bangs always flame)
 }
 
@@ -73,8 +82,21 @@ Config.DefaultFlameColour = 'stock'
 
 -- The tint is multiplied onto GTA's flame texture, so bright saturated colours read best.
 -- rgb = nil means untouched stock GTA flame. 'rainbow' cycles through the spectrum shot by shot.
--- How long a coloured (looped) flame burns before it is stopped, in ms.
-Config.ColouredFlameMs = 140
+-- How coloured flames are drawn. GTA's backfire flame is orange and a tint multiplies it,
+-- so it cannot turn blue/green/etc by itself. A second, tintable effect is added instead.
+-- In a car, type /antilagfx to see every option below in your colour (or /antilagfx 3 for one),
+-- then set Config.ColourFx to the number that looks best.
+--   hideStock = true  -> only the coloured effect (no orange flame underneath)
+Config.ColourFx = 1
+Config.ColourFxOptions = {
+    { label = 'Firework shot burst',       asset = 'scr_indep_fireworks', name = 'scr_indep_firework_shotburst', scale = 0.35, hideStock = true },
+    { label = 'Firework shot + flame',     asset = 'scr_indep_fireworks', name = 'scr_indep_firework_shotburst', scale = 0.30, hideStock = false },
+    { label = 'Firework trail burst',      asset = 'scr_indep_fireworks', name = 'scr_indep_firework_trailburst', scale = 0.20, hideStock = true },
+    { label = 'Firework fountain (A)',     asset = 'scr_indep_fireworks', name = 'scr_indep_firework_fountain', scale = 0.45, looped = true, durationMs = 180, rot = { 90.0, 0.0, 0.0 }, hideStock = true },
+    { label = 'Firework fountain (B)',     asset = 'scr_indep_fireworks', name = 'scr_indep_firework_fountain', scale = 0.45, looped = true, durationMs = 180, rot = { -90.0, 0.0, 0.0 }, hideStock = true },
+    { label = 'Nitrous exhaust flame',     asset = 'veh_xs_vehicle_mods', name = 'veh_nitrous', scale = 1.0, looped = true, durationMs = 160, hideStock = true },
+    { label = 'Tinted backfire (old way)', asset = 'core', name = 'veh_backfire', scale = 1.0, looped = true, durationMs = 140, hideStock = true },
+}
 
 -- Coloured light flash at the exhaust on every flame (also for stock, in orange).
 Config.FlameGlow = true

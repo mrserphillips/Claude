@@ -155,15 +155,15 @@ local function colourLabel(colour)
     return colour or 'Stock'
 end
 
-local function loadPtfx()
-    if HasNamedPtfxAssetLoaded('core') then return true end
-    RequestNamedPtfxAsset('core')
+local function loadPtfx(asset)
+    asset=asset or 'core'
+    if HasNamedPtfxAssetLoaded(asset) then return true end
+    RequestNamedPtfxAsset(asset)
     local untilTime=GetGameTimer()+2500
-    while not HasNamedPtfxAssetLoaded('core') and GetGameTimer()<untilTime do Wait(0) end
-    return HasNamedPtfxAssetLoaded('core')
+    while not HasNamedPtfxAssetLoaded(asset) and GetGameTimer()<untilTime do Wait(0) end
+    return HasNamedPtfxAssetLoaded(asset)
 end
 
-local loadedBanks={}
 local function nativeSound(vehicle,kind)
     local s=Config.NativeSounds[kind] or Config.NativeSounds.pop
     if s.bank and not loadedBanks[s.bank] then
@@ -194,26 +194,39 @@ end
 
 local STOCK_GLOW={1.0,0.47,0.08}
 
--- Coloured flames use a LOOPED particle, because GTA only reliably honours tint on looped
--- effects. It is started at the exhaust and stopped a moment later, so it still reads as a
--- single burst. Stock flames keep the original one-shot particle.
-local function spawnFlame(p,heading,scale,r,g,b)
+-- GTA's backfire flame texture is orange, and tint MULTIPLIES it, so it can never go blue.
+-- Coloured flames therefore add a tintable effect (Config.ColourFxOptions[Config.ColourFx])
+-- on top of, or instead of, the stock flame. Use /antilagfx to try each option in-game.
+local function stockFlame(p,heading,scale)
     UseParticleFxAssetNextCall('core')
-    if not r then
-        StartParticleFxNonLoopedAtCoord('veh_backfire',p.x,p.y,p.z,0.0,0.0,heading,scale,false,false,false)
-        return
-    end
-    local fx=StartParticleFxLoopedAtCoord('veh_backfire',p.x,p.y,p.z,0.0,0.0,heading,scale,false,false,false,false)
-    if not fx or fx==0 then return end
-    SetParticleFxLoopedColour(fx,r,g,b,false)
-    SetTimeout(Config.ColouredFlameMs,function()
-        StopParticleFxLooped(fx,false)
-        RemoveParticleFx(fx,false)
-    end)
+    StartParticleFxNonLoopedAtCoord('veh_backfire',p.x,p.y,p.z,0.0,0.0,heading,scale,false,false,false)
 end
 
--- Short coloured light flash at each exhaust: the colour always shows on the car and
--- the ground, even where the particle itself cannot be tinted.
+local function colourFx(fx,p,heading,scale,r,g,b)
+    local rot=fx.rot or {0.0,0.0,0.0}
+    local s=scale*(fx.scale or 1.0)
+    UseParticleFxAssetNextCall(fx.asset)
+    if fx.looped then
+        local h=StartParticleFxLoopedAtCoord(fx.name,p.x,p.y,p.z,rot[1],rot[2],heading+rot[3],s,false,false,false,false)
+        if not h or h==0 then return end
+        SetParticleFxLoopedColour(h,r,g,b,false)
+        SetTimeout(fx.durationMs or 150,function()
+            StopParticleFxLooped(h,false)
+            RemoveParticleFx(h,false)
+        end)
+    else
+        SetParticleFxNonLoopedColour(r,g,b)
+        StartParticleFxNonLoopedAtCoord(fx.name,p.x,p.y,p.z,rot[1],rot[2],heading+rot[3],s,false,false,false)
+    end
+end
+
+local function spawnFlame(p,heading,scale,r,g,b,fx)
+    if not r then return stockFlame(p,heading,scale) end
+    fx=fx or Config.ColourFxOptions[Config.ColourFx]
+    if not fx or not fx.hideStock then stockFlame(p,heading,scale) end
+    if fx and loadPtfx(fx.asset) then colourFx(fx,p,heading,scale,r,g,b) end
+end
+
 local function glow(points,r,g,b,big)
     if not Config.FlameGlow then return end
     if not r then r,g,b=STOCK_GLOW[1],STOCK_GLOW[2],STOCK_GLOW[3] end
@@ -241,7 +254,7 @@ local function fallbackPoints(vehicle)
 end
 
 local lastFlameByVehicle={}
-local function flame(vehicle,big,colour)
+local function flame(vehicle,big,colour,fx)
     if not DoesEntityExist(vehicle) then return end
 
     -- Hard local safety gate: no vehicle can create visual PTFX faster than this.
@@ -263,7 +276,7 @@ local function flame(vehicle,big,colour)
         if bone~=-1 then points[#points+1]=GetWorldPositionOfEntityBone(vehicle,bone) end
     end
     if #points==0 then points=fallbackPoints(vehicle) end
-    for _,p in ipairs(points) do spawnFlame(p,heading,scale,r,g,b) end
+    for _,p in ipairs(points) do spawnFlame(p,heading,scale,r,g,b,fx) end
     glow(points,r,g,b,big)
 end
 
@@ -284,20 +297,16 @@ local function send(vehicle,kind,withFlame)
     TriggerServerEvent('sp_antilag:effect',VehToNet(vehicle),plateOf(vehicle),kind,withFlame)
 end
 
-local function limiterBurst(vehicle)
-    -- Crackle builds into ONE proper bang instead of every hit sounding the same.
-    send(vehicle,'pop'); Wait(82)
-    send(vehicle,'pop'); Wait(88)
-    send(vehicle,'pop'); Wait(96)
-    send(vehicle,'bang')
+-- Bursts follow Config.LimiterSequence / Config.LiftSequence: { kind, gap-after-ms }.
+local function burst(vehicle,sequence)
+    for i,step in ipairs(sequence) do
+        send(vehicle,step[1])
+        if i<#sequence then Wait(step[2] or 90) end
+    end
 end
 
-local function liftBurst(vehicle)
-    -- Short overrun crackle, then a single hard bang.
-    send(vehicle,'pop'); Wait(95)
-    send(vehicle,'pop'); Wait(120)
-    send(vehicle,'mega')
-end
+local function limiterBurst(vehicle) burst(vehicle,Config.LimiterSequence) end
+local function liftBurst(vehicle) burst(vehicle,Config.LiftSequence) end
 
 -- V4.4 pops & bangs: one irregular overrun shot.
 local function crackleShot(vehicle)
@@ -480,3 +489,29 @@ RegisterCommand('antilagtest',function()
 end,false)
 
 print(('^2[sp_antilag] client v%s loaded (sound mode: %s)^7'):format(GetResourceMetadata(GetCurrentResourceName(),'version',0) or '?',Config.SoundMode))
+
+-- /antilagfx       cycles through every Config.ColourFxOptions entry (3 shots each)
+-- /antilagfx 3     fires only option 3
+-- Uses the vehicle's flame colour, or blue if it is on Stock. Pick the best-looking number
+-- and set Config.ColourFx to it.
+RegisterCommand('antilagfx',function(_,args)
+    local vehicle=GetVehiclePedIsIn(PlayerPedId(),false)
+    if vehicle==0 then return lib.notify({type='error',description='Sit in a vehicle to test flame effects.'}) end
+    local colour=(settingsOf(vehicle) or {}).colour
+    if not resolveColour(colour) then colour='blue' end
+    local only=tonumber(args[1])
+    CreateThread(function()
+        for i,fx in ipairs(Config.ColourFxOptions) do
+            if not only or only==i then
+                lib.notify({description=('Flame FX %d: %s'):format(i,fx.label or fx.name),duration=2500})
+                for n=1,3 do
+                    lastFlameByVehicle={}
+                    flame(vehicle,n==3,colour,fx)
+                    playSound(vehicle,n==3 and 'bang' or 'pop')
+                    Wait(n==3 and 900 or 250)
+                end
+                Wait(600)
+            end
+        end
+    end)
+end,false)

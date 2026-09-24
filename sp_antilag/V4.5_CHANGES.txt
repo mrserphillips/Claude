@@ -1,0 +1,18 @@
+V4.5 PROPER BANGS + COLOURED FLAME EFFECTS
+
+BANGS
+- Rebuilt again: the long filtered-noise + reverb tail in 4.4.4 sounded like a dump valve.
+  Each shot is now crack + overdriven punch + short body + ONE slapback echo.
+  Ring-out: pop 30ms, bang 50ms, mega 65ms (was 200-400ms of hiss).
+- Mega = double report.
+- Burst patterns are now configurable (Config.LimiterSequence / Config.LiftSequence) and
+  both end in a mega bang by default. Overrun: BangChance 0.30, MegaChance 0.15.
+
+COLOURED FLAMES
+- GTA's veh_backfire texture is orange and tint multiplies it, so it cannot become blue,
+  green etc. Coloured flames now use a separate, tintable effect chosen by Config.ColourFx
+  from Config.ColourFxOptions (fireworks bursts/fountain, nitrous flame, old tinted backfire).
+- /antilagfx         fires every option in turn (3 shots each, name shown on screen)
+  /antilagfx <n>     fires only option n
+  Then set Config.ColourFx = n.
+- The coloured light flash from 4.4.4 remains (Config.FlameGlow).

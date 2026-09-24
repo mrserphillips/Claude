@@ -6,26 +6,11 @@
 // Synthesised exhaust pops / bangs. Nothing is prerecorded: every shot is built from
 // noise + a sub "thump" with slight randomisation so no two hits sound identical.
 let ctx = null, master = null, noise = null, shaper = null, hardShaper = null;
-const reverbs = {};
 
 function makeCurve(k) {
     const n = 2048, curve = new Float32Array(n);
     for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curve[i] = Math.tanh(x * k); }
     return curve;
-}
-
-// Decaying-noise impulse = the echo of a bang bouncing off the street.
-function makeReverb(seconds) {
-    const len = Math.floor(ctx.sampleRate * seconds);
-    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-    for (let c = 0; c < 2; c++) {
-        const d = buf.getChannelData(c);
-        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-    }
-    const conv = ctx.createConvolver();
-    conv.buffer = buf;
-    conv.connect(master);
-    return conv;
 }
 
 function init(existing) {
@@ -49,46 +34,33 @@ function init(existing) {
 
     shaper = makeCurve(4);
     hardShaper = makeCurve(12);
-    reverbs.short = makeReverb(0.7);
-    reverbs.long = makeReverb(1.4);
 }
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 
-// crack = sharp bright front edge, body = the main report, boom = low thump, echo = tail.
+// Every shot = crack (tiny full-band impulse) + punch (overdriven pitch-dropping tone, the
+// part you feel) + a short body of filtered noise. Kept SHORT on purpose: a long noise tail
+// sounds like a dump valve / air release instead of a bang.
 const KINDS = {
-    pop:  { crack: [0.30, 0.010, 2500], body: ['bandpass', [900, 1900], 0.9, 0.07, 0.45, false],
-            boom: [140, 60, 0.06, 0.35], echo: null },
-    bang: { crack: [1.60, 0.028, 700],  body: ['lowpass', [2800, 3800], 0.8, 0.20, 1.30, true],
-            boom: [120, 42, 0.26, 1.00], echo: ['short', 0.35] },
-    mega: { crack: [2.20, 0.040, 500],  body: ['lowpass', [3000, 4200], 0.7, 0.34, 1.60, true],
-            boom: [100, 32, 0.40, 1.20], echo: ['long', 0.45] },
+    //     crack gain/len,   punch Hz from->to, len, gain, drive,  body filter Hz, len, gain,  slapback
+    pop:  { crack: [0.35, 0.006], punch: [220, 90, 0.035, 0.35, 'soft'], body: [1400, 0.05, 0.35], slap: 0 },
+    bang: { crack: [1.80, 0.008], punch: [170, 55, 0.090, 1.40, 'hard'], body: [900,  0.07, 1.10], slap: 0.18 },
+    mega: { crack: [2.50, 0.010], punch: [140, 40, 0.140, 1.80, 'hard'], body: [700,  0.10, 1.40], slap: 0.28 },
 };
 
 function envGain(t, peak, dur) {
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(peak, t + 0.0015);
+    g.gain.linearRampToValueAtTime(peak, t + 0.001);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     return g;
 }
 
-function noiseBurst(t, dur, filterType, freq, q, curve, peak, dest) {
-    const src = ctx.createBufferSource();
-    src.buffer = noise;
-    const f = ctx.createBiquadFilter();
-    f.type = filterType; f.frequency.value = freq; f.Q.value = q;
-    const ws = ctx.createWaveShaper(); ws.curve = curve;
-    const g = envGain(t, peak, dur);
-    src.connect(f); f.connect(ws); ws.connect(g); g.connect(dest);
-    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
-}
-
-function shot(kind, volume, muffle, at) {
+function shot(kind, volume, muffle, at, noSlap) {
     const k = KINDS[kind] || KINDS.pop;
     const t = at || ctx.currentTime + 0.005;
-    const scale = rnd(0.88, 1.12);
-    const hard = k.body[5];
+    const scale = rnd(0.9, 1.1);
+    const curve = k.punch[4] === 'hard' ? hardShaper : shaper;
 
     // Distance muffling: further away = duller.
     const out = ctx.createBiquadFilter();
@@ -97,29 +69,38 @@ function shot(kind, volume, muffle, at) {
     const vol = ctx.createGain();
     vol.gain.value = volume;
     out.connect(vol); vol.connect(master);
-    if (k.echo) {
-        const wet = ctx.createGain();
-        wet.gain.value = k.echo[1];
-        vol.connect(wet); wet.connect(reverbs[k.echo[0]]);
-    }
 
-    const [cPeak, cDur, cHp] = k.crack;
-    noiseBurst(t, cDur, 'highpass', cHp, 0.7, hard ? hardShaper : shaper, cPeak, out);
+    // Crack
+    const c = ctx.createBufferSource(); c.buffer = noise;
+    const cg = envGain(t, k.crack[0], k.crack[1]);
+    c.connect(cg); cg.connect(out);
+    c.start(t, Math.random() * 0.5); c.stop(t + k.crack[1] + 0.01);
 
-    const [bType, bF, bQ, bDur, bGain] = k.body;
-    noiseBurst(t, bDur * scale, bType, rnd(bF[0], bF[1]), bQ, hard ? hardShaper : shaper, bGain, out);
-
-    const [f0, f1, oDur, oGain] = k.boom;
-    const o = ctx.createOscillator();
-    o.type = 'sine';
+    // Punch: overdriving the tone adds harmonics, so it is heard on headsets, not just subs.
+    const [f0, f1, pDur, pGain] = k.punch;
+    const o = ctx.createOscillator(); o.type = 'triangle';
     o.frequency.setValueAtTime(f0 * scale, t);
-    o.frequency.exponentialRampToValueAtTime(f1, t + oDur);
-    const og = envGain(t, oGain, oDur * scale);
-    o.connect(og); og.connect(out);
-    o.start(t); o.stop(t + oDur * scale + 0.02);
+    o.frequency.exponentialRampToValueAtTime(f1, t + pDur);
+    const pre = ctx.createGain(); pre.gain.value = 3;
+    const ws = ctx.createWaveShaper(); ws.curve = curve;
+    const og = envGain(t, pGain, pDur * scale);
+    o.connect(pre); pre.connect(ws); ws.connect(og); og.connect(out);
+    o.start(t); o.stop(t + pDur * scale + 0.01);
 
-    // Mega gets a second, slightly delayed report.
-    if (kind === 'mega' && !at) shot('bang', volume * 0.75, muffle, t + rnd(0.05, 0.09));
+    // Body
+    const [bF, bDur, bGain] = k.body;
+    const n = ctx.createBufferSource(); n.buffer = noise;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = bF * rnd(0.85, 1.2); f.Q.value = 0.8;
+    const bws = ctx.createWaveShaper(); bws.curve = curve;
+    const bg = envGain(t, bGain, bDur * scale);
+    n.connect(f); f.connect(bws); bws.connect(bg); bg.connect(out);
+    n.start(t, Math.random() * 0.5); n.stop(t + bDur * scale + 0.01);
+
+    // Slapback: ONE discrete echo off the buildings, not a hissy reverb tail.
+    if (k.slap && !noSlap) shot(kind === 'mega' ? 'bang' : 'pop', volume * k.slap, Math.min(1, muffle + 0.35), t + rnd(0.09, 0.14), true);
+
+    // Mega = a double report.
+    if (kind === 'mega' && !noSlap) shot('bang', volume * 0.8, muffle, t + rnd(0.035, 0.06), true);
 }
 
 window.addEventListener('message', (e) => {
