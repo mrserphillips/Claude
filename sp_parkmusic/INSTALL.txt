@@ -23,3 +23,11 @@ Music
 - .ogg or .mp3 is recommended. Only use music you have the rights to play.
 
 Tweak position, radius, volume and fade times in config.lua.
+
+Troubleshooting: "it plays ambient music, not my songs"
+- Look at the server console after "restart sp_parkmusic". It prints the music folder path
+  and the tracks it found, or why it skipped a file.
+- Files must be directly inside html/music/ (not in a sub-folder).
+- .m4a / .aac / .wma files can't play in-game - convert them to .mp3 or .ogg.
+- "Could not read the music folder": your host blocks folder listing. List the file names
+  in Config.Tracks in config.lua instead, then restart the resource.

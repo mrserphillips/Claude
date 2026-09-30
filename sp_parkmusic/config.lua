@@ -16,6 +16,13 @@ Config.CheckIntervalMs = 500
 --   They are found automatically and play one after another, then loop back to the start.
 --   If the folder is empty, built-in generated ambient music plays instead.
 --   Only use music you have the rights to play on your server.
+--
+--   If the server console says it "could not read the music folder" (some hosts block this),
+--   list the exact file names here instead and they'll be used:
+Config.Tracks = {
+    -- '01_my_song.mp3',
+    -- '02_another_song.ogg',
+}
 Config.Shuffle = false           -- true = random order each time round the playlist
 
 Config.Command = 'parkmusic'     -- /parkmusic toggles the music on/off for that player (remembered)

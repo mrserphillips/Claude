@@ -38,7 +38,10 @@ function nextTrack() {
 function setupTracks() {
     audioEl = new Audio();
     audioEl.addEventListener('ended', nextTrack);
-    audioEl.addEventListener('error', () => setTimeout(nextTrack, 1000));
+    audioEl.addEventListener('error', () => {
+        console.log('[sp_parkmusic] could not play ' + audioEl.src + ' - skipping');
+        setTimeout(nextTrack, 1000);
+    });
     ctx.createMediaElementSource(audioEl).connect(master);
     nextTrack();
 }
@@ -99,7 +102,7 @@ function start() {
     ctx.resume();
     if (audioEl) {
         audioEl.play().catch(() => {});
-    } else {
+    } else if (!scheduler) {
         nextChordAt = nextBellAt = ctx.currentTime + 0.1;
         tick();
         scheduler = setInterval(tick, 250);
@@ -110,6 +113,7 @@ function stop() {
     running = false;
     if (audioEl) audioEl.pause();
     clearInterval(scheduler);
+    scheduler = null;
     ctx.suspend();
 }
 
@@ -127,11 +131,19 @@ function setVolume(vol, fadeMs) {
 
 window.addEventListener('message', e => {
     const d = e.data;
-    if (d.action === 'init' && !ctx) {
+    if (d.action === 'init') {
         tracks = Array.isArray(d.tracks) ? d.tracks : Object.values(d.tracks || {});
         shuffle = !!d.shuffle;
-        setupGraph();
-        if (tracks.length) setupTracks();
+        queue = [];
+        if (!ctx) setupGraph();
+        if (tracks.length && !audioEl) {
+            // Switch from generated music to the folder's tracks.
+            clearInterval(scheduler);
+            scheduler = null;
+            setupTracks();
+        } else if (audioEl && tracks.length) {
+            nextTrack();
+        }
     } else if (d.action === 'volume' && ctx) {
         setVolume(Math.max(0, Math.min(1, d.volume)), d.fadeMs || 1000);
     }

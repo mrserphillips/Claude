@@ -46,6 +46,7 @@ CreateThread(function()
 end)
 
 RegisterNetEvent('sp_parkmusic:tracks', function(tracks)
+    print(('[sp_parkmusic] %d track(s) received from server'):format(#tracks))
     send({ action = 'init', tracks = tracks, shuffle = Config.Shuffle })
 end)
 
