@@ -12,17 +12,20 @@ Config.MuteInVehicle = false     -- true = music fades out while you're in a veh
 Config.CheckIntervalMs = 500
 
 -- Music:
---   Drop .ogg / .mp3 / .wav / .webm files into html/music/ and restart the resource.
+--   Drop .mp3 / .ogg / .wav / .webm / .opus / .flac files into html/music/ and restart the resource.
 --   They are found automatically and play one after another, then loop back to the start.
---   If the folder is empty, built-in generated ambient music plays instead.
 --   Only use music you have the rights to play on your server.
 --
---   If the server console says it "could not read the music folder" (some hosts block this),
---   list the exact file names here instead and they'll be used:
+--   Or list the exact file names here (capitals matter). When this list isn't empty it is
+--   always used instead of scanning the folder:
 Config.Tracks = {
     -- '01_my_song.mp3',
     -- '02_another_song.ogg',
 }
 Config.Shuffle = false           -- true = random order each time round the playlist
+
+-- true = play built-in generated ambient music when no tracks are found.
+-- false = stay silent instead (so you always know you're hearing your own music).
+Config.GeneratedMusic = false
 
 Config.Command = 'parkmusic'     -- /parkmusic toggles the music on/off for that player (remembered)

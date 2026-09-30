@@ -19,7 +19,8 @@ Music
   Number the file names (01_song.mp3, 02_song.mp3...) to control the order,
   or set Config.Shuffle = true for a random order.
 - The server console prints which tracks it found when the resource starts.
-- If the folder is empty, generated calm ambient music (soft pads + chimes) plays instead.
+- If no tracks are found the music stays silent (set Config.GeneratedMusic = true to play
+  built-in generated ambient music instead).
 - .ogg or .mp3 is recommended. Only use music you have the rights to play.
 
 Tweak position, radius, volume and fade times in config.lua.
@@ -31,3 +32,7 @@ Troubleshooting: "it plays ambient music, not my songs"
 - .m4a / .aac / .wma files can't play in-game - convert them to .mp3 or .ogg.
 - "Could not read the music folder": your host blocks folder listing. List the file names
   in Config.Tracks in config.lua instead, then restart the resource.
+- In-game, type /parkmusic_status then press F8: it shows the version, the track list and
+  what is playing, or exactly why a file failed to load.
+- If you still hear ambient music with Config.GeneratedMusic = false, the server is running an
+  old copy of the resource: replace ALL the files and restart it (the status shows the version).

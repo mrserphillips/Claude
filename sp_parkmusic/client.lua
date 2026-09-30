@@ -2,9 +2,43 @@ local enabled = GetResourceKvpInt('sp_parkmusic_off') ~= 1
 local loaded = false
 local lastVolume = -1.0
 local pendingFadeMs = nil
+local nuiReady = false
+local tracks = nil
+local status = 'starting up'
 
 local function send(data)
     SendNUIMessage(data)
+end
+
+local function log(msg, ...)
+    print(('[sp_parkmusic] ' .. msg):format(...))
+end
+
+-- Accept names written as 'song.mp3', 'music/song.mp3' or 'html/music/song.mp3'.
+local function cleanName(name)
+    name = tostring(name):gsub('\\', '/')
+    name = name:gsub('^%.?/?html/music/', ''):gsub('^music/', '')
+    return name
+end
+
+-- Only hand the playlist to the page once both the page and the playlist are ready,
+-- otherwise the message can be lost while the page is still loading.
+local function sendInit()
+    if not nuiReady or not tracks then return end
+    send({ action = 'init', tracks = tracks, shuffle = Config.Shuffle, generated = Config.GeneratedMusic })
+    lastVolume = -1.0 -- resend the current volume to the fresh page
+end
+
+local function setTracks(list, from)
+    tracks = {}
+    for _, name in ipairs(list or {}) do tracks[#tracks + 1] = cleanName(name) end
+    if #tracks > 0 then
+        log('%d track(s) from %s: %s', #tracks, from, table.concat(tracks, ', '))
+    else
+        log('No tracks found (%s). %s', from,
+            Config.GeneratedMusic and 'Playing generated ambient music.' or 'Music stays silent.')
+    end
+    sendInit()
 end
 
 local function targetVolume()
@@ -29,7 +63,11 @@ end
 
 CreateThread(function()
     while not NetworkIsSessionStarted() do Wait(250) end
-    TriggerServerEvent('sp_parkmusic:requestTracks')
+    if Config.Tracks and #Config.Tracks > 0 then
+        setTracks(Config.Tracks, 'Config.Tracks') -- no server round trip needed
+    else
+        TriggerServerEvent('sp_parkmusic:requestTracks')
+    end
 
     -- Resource restarted while already in game.
     if LocalPlayer.state.isLoggedIn then onSpawned() end
@@ -45,9 +83,22 @@ CreateThread(function()
     end
 end)
 
-RegisterNetEvent('sp_parkmusic:tracks', function(tracks)
-    print(('[sp_parkmusic] %d track(s) received from server'):format(#tracks))
-    send({ action = 'init', tracks = tracks, shuffle = Config.Shuffle })
+RegisterNetEvent('sp_parkmusic:tracks', function(list)
+    if Config.Tracks and #Config.Tracks > 0 then return end
+    setTracks(list, 'the html/music folder')
+end)
+
+RegisterNUICallback('ready', function(_, cb)
+    nuiReady = true
+    sendInit()
+    cb('ok')
+end)
+
+-- The page reports what it is actually playing (or why a file failed) so it shows in F8.
+RegisterNUICallback('status', function(data, cb)
+    status = data.message or status
+    log(status)
+    cb('ok')
 end)
 
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', onSpawned)
@@ -65,4 +116,11 @@ RegisterCommand(Config.Command, function()
     EndTextCommandThefeedPostTicker(false, false)
 end, false)
 
+RegisterCommand(Config.Command .. '_status', function()
+    log('version %s | enabled: %s | loaded in: %s | volume: %.2f | tracks: %s | %s',
+        GetResourceMetadata(GetCurrentResourceName(), 'version', 0), tostring(enabled), tostring(loaded),
+        math.max(lastVolume, 0.0), tracks and table.concat(tracks, ', ') or 'waiting', status)
+end, false)
+
 TriggerEvent('chat:addSuggestion', '/' .. Config.Command, 'Toggle the Legion Square park music')
+TriggerEvent('chat:addSuggestion', '/' .. Config.Command .. '_status', 'Show park music status in F8')

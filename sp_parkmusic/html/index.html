@@ -4,7 +4,12 @@
 <body style="background:transparent;margin:0">
 <script>
 let ctx = null, master = null, reverb = null;
-let tracks = [], queue = [], shuffle = false, audioEl = null;
+let tracks = [], queue = [], shuffle = false, generated = false, audioEl = null;
+let failures = 0;
+
+function report(message) {
+    fetch(`https://${GetParentResourceName()}/status`, { method: 'POST', body: JSON.stringify({ message }) }).catch(() => {});
+}
 let running = false, silenceTimer = null, nextChordAt = 0, nextBellAt = 0, scheduler = null;
 
 // ---------- audio graph ----------
@@ -31,16 +36,30 @@ function setupGraph() {
 function nextTrack() {
     // Plays the folder in order, then loops back to the first track.
     if (!queue.length) queue = shuffle ? [...tracks].sort(() => Math.random() - 0.5) : [...tracks];
-    audioEl.src = 'music/' + encodeURIComponent(queue.shift());
-    if (running) audioEl.play().catch(() => {});
+    const name = queue.shift();
+    audioEl.dataset.name = name;
+    audioEl.src = 'music/' + name.split('/').map(encodeURIComponent).join('/');
+    if (running) play();
+}
+
+function play() {
+    audioEl.play().catch(err => report('Could not start "' + audioEl.dataset.name + '": ' + err.message));
 }
 
 function setupTracks() {
     audioEl = new Audio();
     audioEl.addEventListener('ended', nextTrack);
+    audioEl.addEventListener('playing', () => {
+        failures = 0;
+        report('Now playing "' + audioEl.dataset.name + '"');
+    });
     audioEl.addEventListener('error', () => {
-        console.log('[sp_parkmusic] could not play ' + audioEl.src + ' - skipping');
-        setTimeout(nextTrack, 1000);
+        const code = audioEl.error ? audioEl.error.code : 0;
+        report('FAILED to load "' + audioEl.dataset.name + '" - ' + (code === 4
+            ? 'file not found or format not supported. Check the exact name (capitals matter), that it is directly in html/music/, and that the resource was restarted after adding it.'
+            : 'error code ' + code));
+        // Stop retrying once every track has failed, instead of looping forever.
+        if (++failures < tracks.length * 2) setTimeout(nextTrack, 1000);
     });
     ctx.createMediaElementSource(audioEl).connect(master);
     nextTrack();
@@ -101,8 +120,8 @@ function start() {
     running = true;
     ctx.resume();
     if (audioEl) {
-        audioEl.play().catch(() => {});
-    } else if (!scheduler) {
+        play();
+    } else if (generated && !scheduler) {
         nextChordAt = nextBellAt = ctx.currentTime + 0.1;
         tick();
         scheduler = setInterval(tick, 250);
@@ -134,8 +153,11 @@ window.addEventListener('message', e => {
     if (d.action === 'init') {
         tracks = Array.isArray(d.tracks) ? d.tracks : Object.values(d.tracks || {});
         shuffle = !!d.shuffle;
+        generated = !!d.generated;
         queue = [];
+        failures = 0;
         if (!ctx) setupGraph();
+        if (!tracks.length) report(generated ? 'No tracks - playing generated ambient music' : 'No tracks - music is silent');
         if (tracks.length && !audioEl) {
             // Switch from generated music to the folder's tracks.
             clearInterval(scheduler);
@@ -148,6 +170,9 @@ window.addEventListener('message', e => {
         setVolume(Math.max(0, Math.min(1, d.volume)), d.fadeMs || 1000);
     }
 });
+
+// Tell the game the page has loaded and is ready for the playlist.
+fetch(`https://${GetParentResourceName()}/ready`, { method: 'POST', body: '{}' }).catch(() => {});
 </script>
 </body>
 </html>

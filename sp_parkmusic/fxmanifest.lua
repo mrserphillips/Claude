@@ -4,7 +4,7 @@ lua54 'yes'
 
 author 'SP'
 description 'Gentle ambient music around Legion Square park that fades in as players spawn'
-version '1.1.1'
+version '1.2.0'
 
 shared_script 'config.lua'
 client_script 'client.lua'
