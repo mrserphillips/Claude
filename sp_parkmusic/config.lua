@@ -11,13 +11,11 @@ Config.FadeMs = 1500             -- fade speed when walking in/out of the park
 Config.MuteInVehicle = false     -- true = music fades out while you're in a vehicle
 Config.CheckIntervalMs = 500
 
--- Music source:
---   Leave Tracks empty to use the built-in generated ambient music (always works, no files needed).
---   Or drop .ogg/.mp3 files into html/music/ and list them here; they play shuffled on loop.
+-- Music:
+--   Drop .ogg / .mp3 / .wav / .webm files into html/music/ and restart the resource.
+--   They are found automatically and play one after another, then loop back to the start.
+--   If the folder is empty, built-in generated ambient music plays instead.
 --   Only use music you have the rights to play on your server.
-Config.Tracks = {
-    -- 'park1.ogg',
-    -- 'park2.mp3',
-}
+Config.Shuffle = false           -- true = random order each time round the playlist
 
 Config.Command = 'parkmusic'     -- /parkmusic toggles the music on/off for that player (remembered)

@@ -13,9 +13,13 @@ How it works
 - Each player can toggle it with /parkmusic (remembered between sessions).
 
 Music
-- Out of the box it plays generated calm ambient music (soft pads + chimes), no files needed.
-- To use your own music: copy .ogg or .mp3 files into html/music/ and list the file
-  names in Config.Tracks in config.lua. They play shuffled on a loop.
-  Only use music you have the rights to play.
+- Drop your music files (.ogg, .mp3, .wav or .webm) into:  sp_parkmusic/html/music/
+- Restart the resource (restart sp_parkmusic) so the new files get sent to players.
+- The files play one after another (alphabetical order), then loop back to the first.
+  Number the file names (01_song.mp3, 02_song.mp3...) to control the order,
+  or set Config.Shuffle = true for a random order.
+- The server console prints which tracks it found when the resource starts.
+- If the folder is empty, generated calm ambient music (soft pads + chimes) plays instead.
+- .ogg or .mp3 is recommended. Only use music you have the rights to play.
 
 Tweak position, radius, volume and fade times in config.lua.

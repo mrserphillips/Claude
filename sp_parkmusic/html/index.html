@@ -4,7 +4,7 @@
 <body style="background:transparent;margin:0">
 <script>
 let ctx = null, master = null, reverb = null;
-let tracks = [], queue = [], audioEl = null;
+let tracks = [], queue = [], shuffle = false, audioEl = null;
 let running = false, silenceTimer = null, nextChordAt = 0, nextBellAt = 0, scheduler = null;
 
 // ---------- audio graph ----------
@@ -29,8 +29,9 @@ function setupGraph() {
 
 // ---------- file playlist ----------
 function nextTrack() {
-    if (!queue.length) queue = [...tracks].sort(() => Math.random() - 0.5);
-    audioEl.src = 'music/' + queue.shift();
+    // Plays the folder in order, then loops back to the first track.
+    if (!queue.length) queue = shuffle ? [...tracks].sort(() => Math.random() - 0.5) : [...tracks];
+    audioEl.src = 'music/' + encodeURIComponent(queue.shift());
     if (running) audioEl.play().catch(() => {});
 }
 
@@ -128,6 +129,7 @@ window.addEventListener('message', e => {
     const d = e.data;
     if (d.action === 'init' && !ctx) {
         tracks = Array.isArray(d.tracks) ? d.tracks : Object.values(d.tracks || {});
+        shuffle = !!d.shuffle;
         setupGraph();
         if (tracks.length) setupTracks();
     } else if (d.action === 'volume' && ctx) {

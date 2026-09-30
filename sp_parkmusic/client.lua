@@ -29,7 +29,7 @@ end
 
 CreateThread(function()
     while not NetworkIsSessionStarted() do Wait(250) end
-    send({ action = 'init', tracks = Config.Tracks })
+    TriggerServerEvent('sp_parkmusic:requestTracks')
 
     -- Resource restarted while already in game.
     if LocalPlayer.state.isLoggedIn then onSpawned() end
@@ -43,6 +43,10 @@ CreateThread(function()
         end
         Wait(Config.CheckIntervalMs)
     end
+end)
+
+RegisterNetEvent('sp_parkmusic:tracks', function(tracks)
+    send({ action = 'init', tracks = tracks, shuffle = Config.Shuffle })
 end)
 
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', onSpawned)
