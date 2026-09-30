@@ -1,0 +1,21 @@
+sp_parkmusic - gentle music around Legion Square park
+======================================================
+
+1. Put the sp_parkmusic folder in your resources (fxmanifest.lua directly inside it).
+2. Add to server.cfg:   ensure sp_parkmusic
+3. Restart. No database, no dependencies.
+
+How it works
+- When a player spawns / loads their character, the music slowly fades in (8s by default)
+  if they are at Legion Square park.
+- Volume follows distance: full (but soft) volume inside the park, drifting to silent
+  as they walk away. Audio is fully paused when out of range, so it costs nothing.
+- Each player can toggle it with /parkmusic (remembered between sessions).
+
+Music
+- Out of the box it plays generated calm ambient music (soft pads + chimes), no files needed.
+- To use your own music: copy .ogg or .mp3 files into html/music/ and list the file
+  names in Config.Tracks in config.lua. They play shuffled on a loop.
+  Only use music you have the rights to play.
+
+Tweak position, radius, volume and fade times in config.lua.

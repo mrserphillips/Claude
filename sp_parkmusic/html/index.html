@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="background:transparent;margin:0">
+<script>
+let ctx = null, master = null, reverb = null;
+let tracks = [], queue = [], audioEl = null;
+let running = false, silenceTimer = null, nextChordAt = 0, nextBellAt = 0, scheduler = null;
+
+// ---------- audio graph ----------
+function setupGraph() {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain();
+    master.gain.value = 0;
+    master.connect(ctx.destination);
+
+    // Simple generated reverb for a soft, open-air feel.
+    reverb = ctx.createConvolver();
+    const len = ctx.sampleRate * 3.5, ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+        const d = ir.getChannelData(c);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+    }
+    reverb.buffer = ir;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.45;
+    reverb.connect(wet).connect(master);
+}
+
+// ---------- file playlist ----------
+function nextTrack() {
+    if (!queue.length) queue = [...tracks].sort(() => Math.random() - 0.5);
+    audioEl.src = 'music/' + queue.shift();
+    if (running) audioEl.play().catch(() => {});
+}
+
+function setupTracks() {
+    audioEl = new Audio();
+    audioEl.addEventListener('ended', nextTrack);
+    audioEl.addEventListener('error', () => setTimeout(nextTrack, 1000));
+    ctx.createMediaElementSource(audioEl).connect(master);
+    nextTrack();
+}
+
+// ---------- generated ambient music ----------
+const midi = n => 440 * Math.pow(2, (n - 69) / 12);
+// Cmaj7 - Am9 - Fmaj7 - G6sus : slow, warm, loops forever
+const CHORDS = [[48, 55, 64, 71], [45, 52, 60, 67, 71], [41, 53, 57, 64], [43, 55, 62, 64]];
+const BELLS = [72, 74, 76, 79, 81, 84]; // C major pentatonic
+const CHORD_LEN = 9;
+let chordIdx = 0;
+
+function voice(freq, start, dur, peak, type, attack, toReverb) {
+    const osc = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.detune.value = (Math.random() - 0.5) * 12;
+    lp.type = 'lowpass';
+    lp.frequency.value = type === 'sine' ? 4000 : 900;
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.linearRampToValueAtTime(peak, start + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    osc.connect(lp).connect(g);
+    g.connect(master);
+    if (toReverb) g.connect(reverb);
+    osc.start(start);
+    osc.stop(start + dur + 0.1);
+}
+
+function scheduleChord(t) {
+    const notes = CHORDS[chordIdx++ % CHORDS.length];
+    voice(midi(notes[0] - 12), t, CHORD_LEN + 3, 0.05, 'sine', 2.5, false); // soft bass
+    notes.forEach(n => {
+        voice(midi(n), t, CHORD_LEN + 4, 0.025, 'triangle', 3.0, true);
+        voice(midi(n) * 1.003, t, CHORD_LEN + 4, 0.015, 'sine', 3.5, true);
+    });
+}
+
+function scheduleBell(t) {
+    const n = BELLS[Math.floor(Math.random() * BELLS.length)];
+    voice(midi(n), t, 3.5, 0.03, 'sine', 0.02, true);
+    if (Math.random() < 0.3) voice(midi(n + 12), t + 0.01, 2.0, 0.008, 'sine', 0.02, true); // shimmer
+}
+
+function tick() {
+    const ahead = ctx.currentTime + 1.0;
+    while (nextChordAt < ahead) { scheduleChord(nextChordAt); nextChordAt += CHORD_LEN; }
+    while (nextBellAt < ahead) {
+        if (Math.random() < 0.6) scheduleBell(nextBellAt);
+        nextBellAt += 1.2 + Math.random() * 2.5;
+    }
+}
+
+// ---------- start / stop ----------
+function start() {
+    if (running) return;
+    running = true;
+    ctx.resume();
+    if (audioEl) {
+        audioEl.play().catch(() => {});
+    } else {
+        nextChordAt = nextBellAt = ctx.currentTime + 0.1;
+        tick();
+        scheduler = setInterval(tick, 250);
+    }
+}
+
+function stop() {
+    running = false;
+    if (audioEl) audioEl.pause();
+    clearInterval(scheduler);
+    ctx.suspend();
+}
+
+function setVolume(vol, fadeMs) {
+    clearTimeout(silenceTimer);
+    if (vol > 0) start();
+    if (!running) return;
+    const now = ctx.currentTime, g = master.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(vol, now + fadeMs / 1000);
+    // Fully silent: pause everything once the fade finishes so it costs nothing.
+    if (vol <= 0) silenceTimer = setTimeout(stop, fadeMs + 200);
+}
+
+window.addEventListener('message', e => {
+    const d = e.data;
+    if (d.action === 'init' && !ctx) {
+        tracks = Array.isArray(d.tracks) ? d.tracks : Object.values(d.tracks || {});
+        setupGraph();
+        if (tracks.length) setupTracks();
+    } else if (d.action === 'volume' && ctx) {
+        setVolume(Math.max(0, Math.min(1, d.volume)), d.fadeMs || 1000);
+    }
+});
+</script>
+</body>
+</html>
