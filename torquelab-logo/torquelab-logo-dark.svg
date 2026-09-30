@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2F6BFF"/><stop offset="0.5" stop-color="#8A5CFF"/><stop offset="1" stop-color="#FF4FA3"/>
+    </linearGradient>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1A2F8A"/><stop offset="0.65" stop-color="#6A3FB8"/><stop offset="1" stop-color="#E0559E"/>
+    </linearGradient>
+    <mask id="jawcut" maskUnits="userSpaceOnUse" x="-200" y="-200" width="400" height="400">
+      <rect x="-200" y="-200" width="400" height="400" fill="#fff"/>
+      <path d="M108,-19 L160,-19 L160,19 L108,19 A19,19 0 0 1 108,-19 Z" fill="#000" transform="rotate(0)"/>
+    </mask>
+    <clipPath id="inner"><circle cx="200" cy="200" r="125"/></clipPath></defs>
+  <rect width="800" height="800" rx="48" fill="#0B1233"/>
+  <g transform="translate(220,70) scale(0.9)">
+    <path d="M179.05,55.51 L183.31,32.83 L216.69,32.83 L220.95,55.51 L254.10,64.39 L269.13,46.88 L298.03,63.57 L290.39,85.34 L314.66,109.61 L336.43,101.97 L353.12,130.87 L335.61,145.90 L344.49,179.05 L367.17,183.31 L367.17,216.69 L344.49,220.95 L335.61,254.10 L353.12,269.13 L336.43,298.03 L314.66,290.39 L290.39,314.66 L298.03,336.43 L269.13,353.12 L254.10,335.61 L220.95,344.49 L216.69,367.17 L183.31,367.17 L179.05,344.49 L145.90,335.61 L130.87,353.12 L101.97,336.43 L109.61,314.66 L85.34,290.39 L63.57,298.03 L46.88,269.13 L64.39,254.10 L55.51,220.95 L32.83,216.69 L32.83,183.31 L55.51,179.05 L64.39,145.90 L46.88,130.87 L63.57,101.97 L85.34,109.61 L109.61,85.34 L101.97,63.57 L130.87,46.88 L145.90,64.39 Z" fill="url(#grad)"/>
+    <circle cx="200" cy="200" r="128" fill="#0B1233"/>
+    <g clip-path="url(#inner)">
+      <circle cx="200" cy="200" r="128" fill="url(#night)"/>
+      <circle cx="152" cy="104" r="16" fill="#FF6FB5" opacity="0.9"/>
+      <path d="M60,262 L60,212 L86,212 L86,186 L104,186 L104,226 L122,226 L122,150 L134,150 L134,138 L146,138 L146,150 L158,150 L158,234 L174,234 L174,196 L192,178 L210,196 L210,238 L226,238 L226,122 L238,110 L250,122 L250,232 L266,232 L266,176 L292,176 L292,214 L308,214 L308,190 L340,190 L340,262 Z" fill="#1B2A6B"/>
+      <g fill="#FF9BD0" opacity="0.85"><rect x="126" y="158" width="4" height="6" rx="1"/><rect x="134" y="158" width="4" height="6" rx="1"/><rect x="142" y="158" width="4" height="6" rx="1"/><rect x="150" y="158" width="4" height="6" rx="1"/><rect x="126" y="170" width="4" height="6" rx="1"/><rect x="134" y="170" width="4" height="6" rx="1"/><rect x="142" y="170" width="4" height="6" rx="1"/><rect x="150" y="170" width="4" height="6" rx="1"/><rect x="126" y="182" width="4" height="6" rx="1"/><rect x="134" y="182" width="4" height="6" rx="1"/><rect x="142" y="182" width="4" height="6" rx="1"/><rect x="150" y="182" width="4" height="6" rx="1"/><rect x="126" y="194" width="4" height="6" rx="1"/><rect x="134" y="194" width="4" height="6" rx="1"/><rect x="142" y="194" width="4" height="6" rx="1"/><rect x="150" y="194" width="4" height="6" rx="1"/><rect x="126" y="206" width="4" height="6" rx="1"/><rect x="134" y="206" width="4" height="6" rx="1"/><rect x="142" y="206" width="4" height="6" rx="1"/><rect x="150" y="206" width="4" height="6" rx="1"/><rect x="126" y="218" width="4" height="6" rx="1"/><rect x="134" y="218" width="4" height="6" rx="1"/><rect x="142" y="218" width="4" height="6" rx="1"/><rect x="150" y="218" width="4" height="6" rx="1"/><rect x="230" y="130" width="4" height="6" rx="1"/><rect x="238" y="130" width="4" height="6" rx="1"/><rect x="230" y="142" width="4" height="6" rx="1"/><rect x="238" y="142" width="4" height="6" rx="1"/><rect x="230" y="154" width="4" height="6" rx="1"/><rect x="238" y="154" width="4" height="6" rx="1"/><rect x="230" y="166" width="4" height="6" rx="1"/><rect x="238" y="166" width="4" height="6" rx="1"/><rect x="230" y="178" width="4" height="6" rx="1"/><rect x="238" y="178" width="4" height="6" rx="1"/><rect x="230" y="190" width="4" height="6" rx="1"/><rect x="238" y="190" width="4" height="6" rx="1"/><rect x="230" y="202" width="4" height="6" rx="1"/><rect x="238" y="202" width="4" height="6" rx="1"/><rect x="230" y="214" width="4" height="6" rx="1"/><rect x="238" y="214" width="4" height="6" rx="1"/><rect x="270" y="184" width="4" height="6" rx="1"/><rect x="278" y="184" width="4" height="6" rx="1"/><rect x="270" y="196" width="4" height="6" rx="1"/><rect x="278" y="196" width="4" height="6" rx="1"/></g>
+      <rect x="60" y="262" width="280" height="80" fill="#12205A"/>
+      <path d="M72,262 L328,262" stroke="url(#grad)" stroke-width="4"/>
+    </g>
+    <g transform="translate(200,206) rotate(-42) scale(0.86)">
+      <g mask="url(#jawcut)">
+        <path d="M-120,-14 L96,-14 L96,14 L-120,14 A14,14 0 0 1 -120,-14 Z" fill="#F4F7FF" stroke="#0B1233" stroke-width="7" stroke-linejoin="round"/>
+        <circle cx="110" cy="0" r="38" fill="#F4F7FF" stroke="#0B1233" stroke-width="7"/>
+        <path d="M-100,-14 L96,-14 L96,14 L-100,14 Z" fill="#F4F7FF"/>
+        <path d="M-96,0 L60,0" stroke="#C9D3F5" stroke-width="5" stroke-linecap="round"/>
+      </g>
+      <circle cx="-118" cy="0" r="5" fill="#0B1233"/>
+    </g>
+    <circle cx="200" cy="200" r="128" fill="none" stroke="url(#grad)" stroke-width="6"/>
+  </g>
+  <g font-family="'Montserrat','Poppins','Arial Black','Helvetica Neue',Arial,sans-serif" font-weight="900" text-anchor="middle">
+    <text x="400" y="560" font-size="118" letter-spacing="-3" fill="#6F9BFF">Torque<tspan fill="#FF5FAE">Lab</tspan></text>
+    <rect x="180" y="592" width="440" height="5" rx="2.5" fill="url(#grad)"/>
+    <text x="400" y="648" font-size="30" font-weight="700" letter-spacing="12" fill="#C9D3F5">CITY MECHANICS</text>
+  </g>
+</svg>
