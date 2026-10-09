@@ -1,0 +1,76 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+}
+
+#overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+#overlay.visible {
+    opacity: 1;
+}
+
+#wheel-container {
+    position: relative;
+    width: 480px;
+    height: 480px;
+}
+
+#pointer {
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 18px solid transparent;
+    border-right: 18px solid transparent;
+    border-top: 30px solid #ffd60a;
+    z-index: 10;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+}
+
+#wheel-wrap {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 6px solid #ffd60a;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.65), inset 0 0 20px rgba(0, 0, 0, 0.4);
+    transform: rotate(0deg);
+    background: #111;
+}
+
+#wheel {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: block;
+}
+
+#result {
+    font-size: 34px;
+    font-weight: 800;
+    color: #ffd60a;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+    text-align: center;
+    min-height: 44px;
+}
