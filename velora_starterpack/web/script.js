@@ -66,6 +66,7 @@
         mask: '<svg viewBox="0 0 24 24"><path d="M3 8c3-2 15-2 18 0 0 6-3 10-9 10S3 14 3 8z"/><path d="M7 11h3M14 11h3"/></svg>',
         dice: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r=".9"/><circle cx="15" cy="15" r=".9"/><circle cx="15" cy="9" r=".9"/><circle cx="9" cy="15" r=".9"/></svg>',
         lamp: '<svg viewBox="0 0 24 24"><path d="M12 21V8M8 8h8l-2-4h-4L8 8zM9 21h6"/></svg>',
+        car: '<svg viewBox="0 0 24 24"><path d="M5 16h14v-3.5l-1.6-4.2A2 2 0 0015.5 7h-7a2 2 0 00-1.9 1.3L5 12.5V16z"/><path d="M5 12.5h14M3.5 11l1.5 1.5M20.5 11L19 12.5"/><circle cx="8" cy="16.5" r="1.6"/><circle cx="16" cy="16.5" r="1.6"/></svg>',
         journey: '<svg viewBox="0 0 24 24"><path d="M12 2l2.5 6.5L21 9l-5 4.5L17.5 21 12 17l-5.5 4L8 13.5 3 9l6.5-.5L12 2z"/></svg>',
     };
 
@@ -171,6 +172,34 @@
         return tile;
     }
 
+    function vehicleImage(vehicle, wrapClass) {
+        const wrap = el('div', wrapClass);
+        const img = document.createElement('img');
+        img.alt = '';
+        img.draggable = false;
+        img.onerror = () => {
+            img.remove();
+            wrap.classList.add('no-image');
+            wrap.appendChild(svg(ICONS.car));
+        };
+        if (typeof vehicle.image === 'string') img.src = vehicle.image;
+        wrap.appendChild(img);
+        return wrap;
+    }
+
+    const garageText = (vehicle) => vehicle.garage ? txt('vehicleGarage', 'Waiting in: %s').replace('%s', vehicle.garage) : '';
+
+    function vehicleTile(vehicle) {
+        const tile = el('div', 'tile vehicle');
+        tile.appendChild(vehicleImage(vehicle, 'tile-img'));
+        const info = el('div', 'tile-info');
+        info.appendChild(el('div', 'tile-tag', txt('vehicleHeading', 'Your First Ride')));
+        info.appendChild(el('div', 'tile-label', vehicle.label || vehicle.model));
+        info.appendChild(el('div', 'tile-sub', garageText(vehicle)));
+        tile.appendChild(info);
+        return tile;
+    }
+
     function renderCards() {
         const container = $('paths');
         container.innerHTML = '';
@@ -223,6 +252,7 @@
             bonus.appendChild(el('div', 'section-label', txt('bonusHeading', 'Path Bonus')));
             const list = el('div', 'bonus-list');
             (path.items || []).forEach((item) => list.appendChild(itemTile(item)));
+            (path.vehicles || []).forEach((v) => list.appendChild(vehicleTile(v)));
             if (path.money) {
                 if (path.money.cash > 0) list.appendChild(moneyTile('cash', path.money.cash));
                 if (path.money.bank > 0) list.appendChild(moneyTile('bank', path.money.bank));
@@ -247,6 +277,7 @@
         const grid = $('standardGrid');
         grid.innerHTML = '';
         const std = (state.data && state.data.standard) || {};
+        (std.vehicles || []).forEach((v) => grid.appendChild(vehicleTile(v)));
         (std.items || []).forEach((item) => grid.appendChild(itemTile(item)));
         if (std.money) {
             if (std.money.cash > 0) grid.appendChild(moneyTile('cash', std.money.cash));
@@ -389,6 +420,20 @@
             card.appendChild(value);
             moneyRow.appendChild(card);
             setTimeout(() => countUp(value, amount), 600 + i * 150);
+        });
+
+        const vehicleRow = $('rewardVehicles');
+        vehicleRow.innerHTML = '';
+        (rewards.vehicles || []).forEach((vehicle, i) => {
+            const card = el('div', 'vehicle-card');
+            card.style.animationDelay = `${0.6 + i * 0.15}s`;
+            card.appendChild(vehicleImage(vehicle, 'vehicle-img'));
+            const info = el('div', 'vehicle-info');
+            info.appendChild(el('div', 'm-label', txt('vehicleHeading', 'Your First Ride')));
+            info.appendChild(el('div', 'vehicle-name', vehicle.label || vehicle.model));
+            info.appendChild(el('div', 'vehicle-garage', garageText(vehicle)));
+            card.appendChild(info);
+            vehicleRow.appendChild(card);
         });
 
         const grid = $('rewardGrid');
@@ -579,6 +624,7 @@
                 ok: true, path: body.path, pathLabel: path.label,
                 rewards: {
                     items: [...state.data.standard.items, ...path.items],
+                    vehicles: [...state.data.standard.vehicles, ...(path.vehicles || [])],
                     money: { cash: state.data.standard.money.cash, bank: state.data.standard.money.bank },
                 },
             }), 600));
@@ -617,6 +663,7 @@
                 { name: 'lockpick', label: 'Lockpick', count: 3, image: img('lockpick') },
                 { name: 'pumpkin_patch_card', label: 'Pumpkin Patch Card', count: 1, image: img('pumpkin_patch_card') },
             ],
+            vehicles: [{ model: 'issi8', label: 'Weeny Issi Rally', image: 'https://docs.fivem.net/vehicles/issi8.webp', garage: 'Legion Square car park' }],
             money: { cash: 25000, bank: 15000 },
         },
     };

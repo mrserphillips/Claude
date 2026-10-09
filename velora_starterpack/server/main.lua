@@ -180,8 +180,47 @@ local function validateConfig()
         end
     end
 
+    local function checkVehicles(list, where)
+        if list == nil then return end
+        if type(list) ~= 'table' then
+            configErrors[#configErrors + 1] = ('%s.vehicles is not a table'):format(where)
+            return
+        end
+        if #list == 0 then return end
+
+        if GetResourceState('qbx_vehicles') ~= 'started' then
+            configErrors[#configErrors + 1] = ('%s.vehicles needs qbx_vehicles, which is not started'):format(where)
+            return
+        end
+
+        local garages
+        if GetResourceState('qbx_garages') == 'started' then
+            local ok, result = pcall(function() return exports.qbx_garages:GetGarages() end)
+            if ok and type(result) == 'table' then garages = result end
+        end
+
+        for i, entry in ipairs(list) do
+            if type(entry) ~= 'table' or type(entry.model) ~= 'string' or entry.model == '' then
+                configErrors[#configErrors + 1] = ('%s.vehicles[%d] has no valid model'):format(where, i)
+            else
+                -- GetVehiclesByName returns the whole list for unknown keys, so compare the model.
+                local ok, info = pcall(function() return exports.qbx_core:GetVehiclesByName(entry.model) end)
+                if not ok or type(info) ~= 'table' or info.model ~= entry.model then
+                    configErrors[#configErrors + 1] = ('vehicle "%s" (%s) is not in qbx_core/shared/vehicles.lua — add it there (and make sure your game build supports it)'):format(entry.model, where)
+                end
+                local garage = entry.garage or Config.Vehicles.defaultGarage
+                if type(garage) ~= 'string' or garage == '' then
+                    configErrors[#configErrors + 1] = ('%s.vehicles[%d] (%s) has no garage and no Config.Vehicles.defaultGarage'):format(where, i, entry.model)
+                elseif garages and not garages[garage] then
+                    configErrors[#configErrors + 1] = ('garage "%s" for vehicle "%s" (%s) does not exist in qbx_garages'):format(garage, entry.model, where)
+                end
+            end
+        end
+    end
+
     checkItems(Rewards.standard.items, 'standard')
     checkMoney(Rewards.standard.money, 'standard')
+    checkVehicles(Rewards.standard.vehicles, 'standard')
 
     for key, path in pairs(Rewards.paths) do
         if type(key) ~= 'string' or not key:match('^[%w_]+$') or #key > 32 then
@@ -189,6 +228,7 @@ local function validateConfig()
         end
         checkItems(path.items or {}, ('paths.%s'):format(key))
         checkMoney(path.money, ('paths.%s'):format(key))
+        checkVehicles(path.vehicles, ('paths.%s'):format(key))
     end
 
     for _, key in ipairs(Rewards.pathOrder) do
@@ -201,7 +241,7 @@ local function validateConfig()
         for _, err in ipairs(configErrors) do logError('Config: %s', err) end
         logError('%d configuration problem(s) found. Claims are BLOCKED until fixed so nobody receives a broken pack.', #configErrors)
     else
-        logInfo('Configuration validated — all reward items exist in ox_inventory.')
+        logInfo('Configuration validated — all reward items and vehicles are available.')
     end
 
     return #configErrors == 0
@@ -249,7 +289,24 @@ local function mergedItems(pathKey)
     return out
 end
 
--- Builds the ordered list of grant steps. Items first, money last.
+local function garageOf(entry)
+    return entry.garage or Config.Vehicles.defaultGarage
+end
+
+local function garageLabel(garage)
+    return Config.Vehicles.garageLabels[garage] or garage
+end
+
+-- Standard + path vehicles, in order (each entry is one vehicle).
+local function mergedVehicles(pathKey)
+    local out = {}
+    for _, list in ipairs({ Rewards.standard.vehicles or {}, Rewards.paths[pathKey].vehicles or {} }) do
+        for _, entry in ipairs(list) do out[#out + 1] = entry end
+    end
+    return out
+end
+
+-- Builds the ordered list of grant steps. Items, then vehicles, then money.
 local function buildSteps(pathKey)
     local steps = {}
 
@@ -274,6 +331,17 @@ local function buildSteps(pathKey)
                 metadata = entry.metadata, def = def,
             }
         end
+    end
+
+    -- One step per vehicle. The key numbers repeats of the same model.
+    local seen = {}
+    for _, entry in ipairs(mergedVehicles(pathKey)) do
+        seen[entry.model] = (seen[entry.model] or 0) + 1
+        steps[#steps + 1] = {
+            key = ('vehicle:%s#%d'):format(entry.model, seen[entry.model]),
+            kind = 'vehicle', model = entry.model, label = entry.label or entry.model,
+            garage = garageOf(entry), props = entry.props, count = 1,
+        }
     end
 
     local money = moneyFor(pathKey)
@@ -304,6 +372,20 @@ local function displayItems(list)
     return out
 end
 
+local function displayVehicles(list)
+    local out = {}
+    for _, entry in ipairs(list or {}) do
+        local garage = garageOf(entry)
+        out[#out + 1] = {
+            model = entry.model,
+            label = entry.label or entry.model,
+            image = Config.Vehicles.imagePath:format(entry.model),
+            garage = garageLabel(garage),
+        }
+    end
+    return out
+end
+
 local function displayMoney(money)
     money = money or {}
     return { cash = money.cash or 0, bank = money.bank or 0 }
@@ -323,6 +405,7 @@ local function buildUiPayload(row, token, openedBy)
                 theme = p.theme or key,
                 tags = p.tags or {},
                 items = displayItems(p.items),
+                vehicles = displayVehicles(p.vehicles),
                 money = displayMoney(p.money),
             }
         end
@@ -334,6 +417,7 @@ local function buildUiPayload(row, token, openedBy)
         paths = paths,
         standard = {
             items = displayItems(Rewards.standard.items),
+            vehicles = displayVehicles(Rewards.standard.vehicles),
             money = displayMoney(Rewards.standard.money),
         },
         resume = row and row.status == 'pending' and { path = row.path } or nil,
@@ -345,6 +429,7 @@ end
 local function rewardSummary(pathKey)
     return {
         items = displayItems(mergedItems(pathKey)),
+        vehicles = displayVehicles(mergedVehicles(pathKey)),
         money = moneyFor(pathKey),
     }
 end
@@ -647,8 +732,29 @@ end
 
 -- Returns true if the given step was delivered, false if it provably was not,
 -- or nil if the outcome is unknown (an export threw mid-call).
-local function grantStep(src, step)
-    if step.kind == 'item' then
+local function grantStep(src, step, citizenid)
+    if step.kind == 'vehicle' then
+        local ok, vehicleId, errResult = pcall(function()
+            return exports.qbx_vehicles:CreatePlayerVehicle({
+                model = step.model,
+                citizenid = citizenid,
+                garage = step.garage,
+                props = step.props,
+            })
+        end)
+        if not ok then
+            logError('qbx_vehicles:CreatePlayerVehicle threw for %s: %s', step.model, tostring(vehicleId))
+            return nil
+        end
+        if not vehicleId then
+            logWarn('qbx_vehicles:CreatePlayerVehicle refused %s for %s (%s)', step.model, citizenid,
+                type(errResult) == 'table' and tostring(errResult.message or errResult.code) or tostring(errResult))
+            return false
+        end
+        logInfo('Created starter vehicle %s (vehicle id %s) for %s in garage %s.', step.model, tostring(vehicleId), citizenid, step.garage)
+        addHistory(citizenid, 'vehicle', nil, playerLabel(src), ('%s id=%s garage=%s'):format(step.model, tostring(vehicleId), step.garage))
+        return true
+    elseif step.kind == 'item' then
         local ok, success, response = pcall(function()
             return exports.ox_inventory:AddItem(src, step.name, step.count, step.metadata)
         end)
@@ -765,7 +871,7 @@ local function processClaim(src, citizenid, pathKey, player)
         end
 
         -- 2) Grant.
-        local delivered, reason = grantStep(src, step)
+        local delivered, reason = grantStep(src, step, citizenid)
 
         -- 3) Record the outcome.
         if delivered == true then
@@ -807,6 +913,10 @@ local function processClaim(src, citizenid, pathKey, player)
 
     savePlayer(src)
     addHistory(citizenid, 'completed', pathKey, playerLabel(src), needsReview and 'needs_review' or nil)
+
+    for _, entry in ipairs(mergedVehicles(pathKey)) do
+        notify(src, Msg.vehicleReady:format(entry.label or entry.model, garageLabel(garageOf(entry))), 'success')
+    end
 
     local summary = rewardSummary(pathKey)
     logInfo('%s [%s / %s] completed the %s starter pack (%d step(s) granted this attempt%s).',
@@ -1096,9 +1206,9 @@ CreateThread(function()
     validateConfig()
 end)
 
--- Re-validate if ox_inventory is restarted (items may have been added).
+-- Re-validate if ox_inventory / qbx_vehicles / qbx_garages (re)start.
 AddEventHandler('onResourceStart', function(name)
-    if name == 'ox_inventory' then
+    if name == 'ox_inventory' or name == 'qbx_vehicles' or name == 'qbx_garages' then
         SetTimeout(2000, validateConfig)
     end
 end)

@@ -14,6 +14,8 @@ New characters visit the **Velora welcome host**, a ped standing in the **Legion
 | `ox_inventory` | All items are granted through its server exports |
 | `ox_lib` | Callbacks and notifications |
 | `oxmysql` | Persistent claim tracking |
+| `qbx_vehicles` | Creates the owned starter vehicle (`CreatePlayerVehicle`) |
+| `qbx_garages` | Stores it in the Legion Square car park garage (`pillboxgarage`) |
 | `ox_target` *(optional)* | Third-eye interaction with the ped. Without it, players get an `[E]` prompt instead. |
 
 No ESX or qb-inventory functions are used.
@@ -30,9 +32,11 @@ No ESX or qb-inventory functions are used.
    `phone`, `cos_sprunk`, `bbs_double_cheese_goat`, `lockpick`, `pumpkin_patch_card`, `bodywavewigs`, `pink_messenger_bag`, `ls_og_kush_bag`, `ls_og_kush_seed`.
    On start, the resource prints a clear `ERROR` line for each missing item. **Claims are blocked until the problem is fixed**, so nobody receives a broken pack. Item icons come from `ox_inventory/web/images/<item>.png`; if an icon is missing, the UI shows a styled letter instead.
 
-4. **Avoid a double phone.** qbx_core gives its own starter items (`qbx_core/config/shared.lua → starterItems`). If that list includes `phone`, remove it there, or remove it from this resource's `Config.Rewards.standard.items`.
+4. **Starter vehicle (Weeny Issi Rally, `issi8`).** Every character gets one, stored in the **Legion Square car park** garage (`pillboxgarage` in qbx_garages), right next to the welcome host. `issi8` is already in `qbx_core/shared/vehicles.lua`. It's a newer GTA vehicle from The Chop Shop update, so your server needs a recent game build, for example `sv_enforceGameBuild 3095` or higher in server.cfg. On an older build the vehicle won't spawn from the garage.
 
-5. **server.cfg.** Start the resource **after** its dependencies and add the ACE lines:
+5. **Avoid a double phone.** qbx_core gives its own starter items (`qbx_core/config/shared.lua → starterItems`). If that list includes `phone`, remove it there, or remove it from this resource's `Config.Rewards.standard.items`.
+
+6. **server.cfg.** Start the resource **after** its dependencies and add the ACE lines:
 
    ```cfg
    ensure oxmysql
@@ -49,7 +53,7 @@ No ESX or qb-inventory functions are used.
    # add_ace identifier.license:xxxxxxxxxxxxxxxx velora.starterpack.admin allow
    ```
 
-6. Restart the server or run `ensure velora_starterpack`.
+7. Restart the server or run `ensure velora_starterpack`.
 
 ---
 
@@ -105,6 +109,7 @@ This only triggers once the character is fully in the world.
 | Partial failures | Every reward is a recorded step. Stackable items are one step; **non-stackable items are one step per unit**, because ox_inventory can partially fill non-stackables. Each step is written as `granting` before it is given and `granted` after. A retry only gives steps that are not `granted`. |
 | Crash or restart mid-claim | A step left in `granting` has an unknown outcome, so it is **never re-granted automatically**. It is flagged `review`, the claim is marked `needs_review`, and staff can see it in `/startercheck`. Duplicates are therefore impossible even across crashes. |
 | Completion | A claim is marked `completed` only after every step has been processed. Until then it stays `pending`, the path stays locked, and the player can finish with `/starterpack` (the UI opens in "Collect my rewards" mode). |
+| Vehicle | Created with `exports.qbx_vehicles:CreatePlayerVehicle({ model, citizenid, garage })` as its own recorded step. A refused creation (for example a cancelled event hook) is retried later. An error with an unknown outcome is flagged for review and never re-created automatically. Each creation is logged with the vehicle ID in `velora_starterpack_history`. |
 | Money | Granted through `exports.qbx_core:AddMoney(source, 'cash' / 'bank', amount, reason)` and saved with `exports.qbx_core:Save(source)`. Money is never added as raw items. |
 
 > A note on crash safety: qbx_core and ox_inventory also save player data on their own schedules. If the whole server crashes, data that hadn't been saved yet can be lost. This affects every resource, not just this one. This resource records its own progress immediately and forces a qbx player save after granting money and when a claim completes.
@@ -114,6 +119,7 @@ These APIs were checked against the current qbx_core and ox_inventory source:
 - `exports.qbx_core:GetPlayer`, `GetPlayerByCitizenId`, `AddMoney`, `Save`
 - `QBCore:Client:OnPlayerLoaded`, `QBCore:Client:OnPlayerUnload`, `qbx_core:client:playerLoggedOut`, `QBCore:Server:OnPlayerUnload`, `qb-clothes:client:CreateFirstCharacter`
 - `exports.ox_inventory:Items`, `GetInventory`, `AddItem`
+- `exports.qbx_vehicles:CreatePlayerVehicle`, `exports.qbx_garages:GetGarages`, `exports.qbx_core:GetVehiclesByName`
 - `exports.ox_target:addLocalEntity`, `removeLocalEntity`; `lib.points`, `lib.showTextUI`, `lib.requestModel`
 
 ---
@@ -150,8 +156,9 @@ Everything is in `config.lua`:
 - `Config.Debug`: verbose console output
 - `Config.AutoOpen`: enable, `mode` (`'notify'` or `'menu'`), waypoint, delay, stability window, max wait, appearance events, reopen on resource restart
 - `Config.Command`: the `/starterpack` command name or disable it
-- `Config.Rewards.standard`: items and `money = { cash, bank }` for everyone
-- `Config.Rewards.paths.civilian` / `.criminal`: title, subtitle, description, tags, bonus items and optional extra money
+- `Config.Rewards.standard`: items, `money = { cash, bank }` and `vehicles` for everyone
+- `Config.Vehicles`: default garage, friendly garage names, vehicle image URL
+- `Config.Rewards.paths.civilian` / `.criminal`: title, subtitle, description, tags, bonus items, optional extra money and optional `vehicles`
 - `Config.Inventory`: cash item name and icon path
 - `Config.Security`: cooldowns, DB lock timeout, spam-logging threshold
 - `Config.Admin`: ACE name, command names, reset confirmation window
@@ -173,7 +180,8 @@ Open `web/index.html` in a desktop browser. Outside FiveM it runs a preview with
 
 ## Troubleshooting
 
-- **"The starter pack is temporarily unavailable"**: check the server console for `Config:` errors, usually a missing item in ox_inventory.
+- **"The starter pack is temporarily unavailable"**: check the server console for `Config:` errors. Usually an item is missing from ox_inventory, a vehicle is missing from `qbx_core/shared/vehicles.lua`, or a garage name is wrong.
+- **Car not in the garage**: run `/startercheck [id]`. Look for `vehicle:issi8#1` under NEEDS REVIEW, and check `velora_starterpack_history` for the vehicle ID.
 - **No arrival notification**: set `Config.Debug = true` and watch the F8 console for readiness messages. Another resource may be holding NUI focus. Players can still walk to the ped.
 - **Ped floating or sunk into the ground**: re-take the coordinates with `/coords` while standing on that spot. Use your standing height, not the ground height.
 - **"You need to be with the Velora welcome host…"**: the player is more than `maxServerDistance` from `Config.Ped.coords`. If you moved the ped, check that the coordinates you pasted are where it actually stands.

@@ -148,6 +148,13 @@ Config.Rewards = {
             cash = 25000,
             bank = 15000,
         },
+        -- Owned vehicles, created through qbx_vehicles and stored in a garage.
+        -- model  = spawn name (must be in qbx_core/shared/vehicles.lua)
+        -- garage = qbx_garages garage name ('pillboxgarage' = Legion Square car park)
+        -- props  = optional ox_lib vehicle properties, e.g. { color1 = { 255, 79, 163 } }
+        vehicles = {
+            { model = 'issi8', label = 'Weeny Issi Rally', garage = 'pillboxgarage' },
+        },
     },
 
     -- The two selectable paths. The keys ('civilian' / 'criminal') are what
@@ -187,6 +194,20 @@ Config.Rewards = {
 
 -- Reason string passed to qbx_core AddMoney (shows in money logs).
 Config.MoneyReason = 'velora-starter-pack'
+
+---------------------------------------------------------------------------
+-- VEHICLES
+---------------------------------------------------------------------------
+Config.Vehicles = {
+    -- Used when a vehicle entry has no garage of its own.
+    defaultGarage = 'pillboxgarage',
+    -- Friendly garage names shown in the UI / notifications.
+    garageLabels = {
+        pillboxgarage = 'Legion Square car park',
+    },
+    -- Image shown in the UI. %s = model. Falls back to a car icon if missing.
+    imagePath = 'https://docs.fivem.net/vehicles/%s.webp',
+}
 
 ---------------------------------------------------------------------------
 -- INVENTORY
@@ -283,6 +304,8 @@ Config.UI = {
         resumeNotice   = 'Your path has been chosen. Make space in your inventory and continue to collect your remaining rewards.',
         resumeButton   = 'COLLECT MY REWARDS',
         closeHint      = 'Press ESC to decide later — come back to the welcome host any time.',
+        vehicleHeading = 'Your First Ride',
+        vehicleGarage  = 'Waiting in: %s',
         cashLabel      = 'Cash',
         bankLabel      = 'Bank',
     },
@@ -312,6 +335,7 @@ Config.Notify = {
         needsReview     = 'Your starter pack is complete, but one reward needs staff review. Please open a ticket.',
         dbError         = 'A database error occurred. Please try again shortly.',
         noPermission    = 'You do not have permission to do that.',
+        vehicleReady    = 'Your %s is waiting for you in the %s garage.',
         tooFar          = 'You need to be with the Velora welcome host at the Legion Square car park.',
         visitPed        = 'Welcome to Velora City! Collect your free starter pack from the welcome host at the Legion Square car park — it is marked on your GPS.',
     },

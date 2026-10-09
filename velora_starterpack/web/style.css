@@ -353,6 +353,18 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .tile.money svg { width: 24px; height: 24px; fill: none; stroke: #ffd98a; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tile.money .tile-count { color: #ffd98a; font-size: 15px; }
 
+/* Vehicle tile (spans two columns) */
+.tile.vehicle {
+    grid-column: span 2;
+    background: linear-gradient(120deg, rgba(255, 79, 163, .14), rgba(139, 44, 255, .08));
+    border-color: rgba(255, 79, 163, .35);
+}
+.tile.vehicle .tile-img { width: 112px; height: 62px; border-radius: 10px; }
+.tile.vehicle .tile-img img { width: 100%; height: 100%; object-fit: cover; filter: none; }
+.tile.vehicle .tile-img svg, .vehicle-img svg { width: 60%; height: 60%; fill: none; stroke: var(--pink-soft); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.tile-tag { font-size: 9.5px; letter-spacing: .25em; text-transform: uppercase; font-weight: 700; color: var(--pink); margin-bottom: 2px; }
+.tile-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
 /* ---------- Buttons ---------- */
 .btn {
     position: relative; overflow: hidden;
@@ -503,6 +515,28 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .money-card .m-label { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: rgba(255, 230, 190, .8); font-weight: 700; }
 .money-card .m-value { font-family: var(--font-display); font-size: clamp(24px, 2.2vw, 36px); font-weight: 700; color: #ffd98a; margin-top: 6px; text-shadow: 0 0 20px rgba(255, 200, 120, .4); }
 
+/* Featured vehicle on the reward screen */
+.vehicle-row { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.vehicle-card {
+    display: flex; align-items: center; gap: 22px; text-align: left;
+    padding: 14px 26px 14px 14px; border-radius: var(--radius);
+    background: linear-gradient(120deg, rgba(255, 79, 163, .16), rgba(139, 44, 255, .1));
+    border: 1px solid rgba(255, 79, 163, .45);
+    box-shadow: 0 0 40px rgba(255, 79, 163, .18);
+    animation: pop .6s var(--ease) both;
+}
+.vehicle-img {
+    width: clamp(160px, 14vw, 240px); aspect-ratio: 16 / 9;
+    border-radius: 14px; overflow: hidden;
+    display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 40%, rgba(255, 79, 163, .3), rgba(0, 0, 0, .35));
+    border: 1px solid rgba(255, 255, 255, .1);
+}
+.vehicle-img img { width: 100%; height: 100%; object-fit: cover; }
+.vehicle-info .m-label { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; font-weight: 700; color: var(--pink-soft); }
+.vehicle-name { font-family: var(--font-display); font-weight: 700; font-size: clamp(20px, 1.8vw, 30px); margin-top: 6px; }
+.vehicle-garage { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
 .reward-grid-final { margin-top: clamp(16px, 2.5vh, 28px); text-align: left; }
 .reward-grid-final .tile { opacity: 0; animation: tileIn .55s var(--ease) forwards; }
 @keyframes tileIn { from { opacity: 0; transform: translateY(18px) scale(.94); } to { opacity: 1; transform: none; } }
@@ -510,6 +544,9 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .review-note { margin-top: 18px; color: #ffd98a; font-size: 13px; }
 
 /* ---------- Responsive ---------- */
+@media (max-width: 600px) {
+    .tile.vehicle { grid-column: span 1; }
+}
 @media (max-width: 900px) {
     .bonus-list, .reward-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
     .card:hover { transform: translateY(-4px); }
