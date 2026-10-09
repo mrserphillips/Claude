@@ -3,8 +3,8 @@ game 'gta5'
 lua54 'yes'
 
 author 'you'
-description 'Table prop giveaway signup (ox_target) + server-synced winner wheel'
-version '1.0.0'
+description 'Casino lucky wheel prop giveaway: ox_target sign-up + admin spin, server-synced winner wheel'
+version '1.1.0'
 
 shared_script '@ox_lib/init.lua'
 shared_script 'config.lua'

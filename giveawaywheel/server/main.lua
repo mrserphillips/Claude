@@ -103,9 +103,7 @@ AddEventHandler('playerDropped', function()
     end
 end)
 
-RegisterCommand(Config.Commands.spin, function(src)
-    if src == 0 then return end -- must be run in-game, not server console
-
+local function TrySpin(src)
     if not IsAdmin(src) then
         Config.Notify(src, 'You do not have permission to do that.', 'error')
         return
@@ -144,20 +142,18 @@ RegisterCommand(Config.Commands.spin, function(src)
         end
         print(('[giveaway] winner: %s (ID: %d)'):format(winner.name, winner.id))
     end)
-end, false)
+end
 
-RegisterCommand(Config.Commands.clear, function(src)
-    if src == 0 then return end
+local function TryClear(src)
     if not IsAdmin(src) then
         Config.Notify(src, 'You do not have permission to do that.', 'error')
         return
     end
     ClearEntrants()
     Config.Notify(src, 'Giveaway sign-up list cleared.', 'success')
-end, false)
+end
 
-RegisterCommand(Config.Commands.list, function(src)
-    if src == 0 then return end
+local function TryList(src)
     if not IsAdmin(src) then
         Config.Notify(src, 'You do not have permission to do that.', 'error')
         return
@@ -174,6 +170,33 @@ RegisterCommand(Config.Commands.list, function(src)
         names[#names + 1] = ('%s (ID: %d)'):format(e.name, e.id)
     end
     Config.Notify(src, table.concat(names, ', '), 'inform')
+end
+
+-- Lets the client decide whether to show the admin target options. Purely cosmetic -
+-- every admin action below re-checks IsAdmin() itself.
+lib.callback.register('giveaway:server:isAdmin', function(src)
+    return IsAdmin(src)
+end)
+
+-- Triggered from the ox_target options on the wheel prop
+RegisterNetEvent('giveaway:server:spin', function() TrySpin(source) end)
+RegisterNetEvent('giveaway:server:clear', function() TryClear(source) end)
+RegisterNetEvent('giveaway:server:list', function() TryList(source) end)
+
+-- Chat commands still work as a fallback (must be run in-game, not server console)
+RegisterCommand(Config.Commands.spin, function(src)
+    if src == 0 then return end
+    TrySpin(src)
+end, false)
+
+RegisterCommand(Config.Commands.clear, function(src)
+    if src == 0 then return end
+    TryClear(src)
+end, false)
+
+RegisterCommand(Config.Commands.list, function(src)
+    if src == 0 then return end
+    TryList(src)
 end, false)
 
 -- Not permission-gated on purpose: run this yourself to see exactly why IsAdmin()
