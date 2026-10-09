@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Velora Starter Pack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" class="hidden" aria-hidden="true">
+    <!-- Atmosphere -->
+    <div class="bg">
+        <div class="bg-gradient"></div>
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="orb orb-c"></div>
+        <div class="bg-grid"></div>
+        <canvas id="particles"></canvas>
+        <div class="vignette"></div>
+    </div>
+
+    <button class="close-btn" id="closeBtn" title="Decide later" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+
+    <!-- ============ SCREEN: SELECT ============ -->
+    <main class="screen screen-select" id="screenSelect">
+        <header class="hero">
+            <div class="brand"><span class="brand-line"></span><span id="txtBrand">VELORA CITY</span><span class="brand-line"></span></div>
+            <h1 class="hero-title" id="txtWelcomeTitle">WELCOME TO VELORA CITY</h1>
+            <p class="hero-subtitle" id="txtWelcomeSubtitle">Every story has a beginning. What will yours be?</p>
+        </header>
+
+        <div class="resume-banner hidden" id="resumeBanner">
+            <svg viewBox="0 0 24 24"><path d="M12 8v5m0 3.5v.01M10.3 3.9L2.4 17.6A2 2 0 004.1 20.6h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+            <span id="txtResume"></span>
+        </div>
+
+        <section class="paths" id="paths"><!-- cards injected --></section>
+
+        <section class="standard glass">
+            <div class="standard-head">
+                <div>
+                    <h2 id="txtStandardHeading">Included With Every Path</h2>
+                    <p id="txtStandardSubtitle">Whichever path you choose, you also receive all of these.</p>
+                </div>
+                <div class="both-badge">
+                    <span class="dot dot-civ"></span><span class="dot dot-crim"></span> BOTH PATHS
+                </div>
+            </div>
+            <div class="reward-grid" id="standardGrid"></div>
+        </section>
+
+        <p class="hint" id="txtCloseHint"></p>
+    </main>
+
+    <!-- ============ SCREEN: REWARDS ============ -->
+    <main class="screen screen-reward hidden" id="screenReward">
+        <div class="reward-burst"></div>
+        <div class="reward-inner">
+            <div class="brand"><span class="brand-line"></span><span id="txtBrand2">VELORA CITY</span><span class="brand-line"></span></div>
+            <h1 class="reward-title" id="txtRewardTitle">YOUR VELORA JOURNEY BEGINS!</h1>
+            <div class="path-badge" id="rewardPathBadge"></div>
+            <p class="reward-subtitle" id="txtRewardSubtitle">Your rewards have been delivered.</p>
+
+            <div class="money-row" id="rewardMoney"></div>
+            <div class="reward-grid reward-grid-final" id="rewardGrid"></div>
+
+            <div class="review-note hidden" id="reviewNote"></div>
+
+            <button class="btn btn-primary btn-xl" id="finishBtn">
+                <span id="txtFinish">WELCOME TO VELORA</span>
+            </button>
+        </div>
+    </main>
+
+    <!-- ============ CONFIRM MODAL ============ -->
+    <div class="modal-layer hidden" id="confirmModal" role="dialog" aria-modal="true">
+        <div class="modal glass" id="confirmBox">
+            <div class="modal-icon" id="confirmIcon"></div>
+            <h3 id="txtConfirmTitle">Begin Your Journey?</h3>
+            <p id="confirmText"></p>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="backBtn"><span id="txtBack">Go Back</span></button>
+                <button class="btn btn-primary" id="confirmBtn"><span id="txtConfirm">Confirm My Journey</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ PROCESSING ============ -->
+    <div class="modal-layer hidden" id="processing">
+        <div class="processing">
+            <div class="loader"><span></span><span></span><span></span></div>
+            <p id="txtProcessing">Preparing your rewards…</p>
+        </div>
+    </div>
+
+    <!-- ============ TOAST ============ -->
+    <div class="toast hidden" id="toast" role="alert"></div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
