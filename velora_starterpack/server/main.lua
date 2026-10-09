@@ -465,8 +465,18 @@ end)
 -- Opening the menu
 ---------------------------------------------------------------------------
 
+-- Server-side proximity check against the configured starter pack ped.
+local function isNearPed(src)
+    local cfg = Config.Ped
+    if not cfg.enabled or not cfg.requireNearby then return true end
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 then return false end
+    local c = cfg.coords
+    return #(GetEntityCoords(ped) - vector3(c.x, c.y, c.z)) <= cfg.maxServerDistance
+end
+
 ---@return table|nil payload, string|nil errorMessage
-local function prepareOpen(src, openedBy)
+local function prepareOpen(src, openedBy, requireNear)
     if not Config.Enabled then return nil, Msg.disabled end
     if not isLoggedIn(src) then return nil, Msg.notLoaded end
 
@@ -484,8 +494,10 @@ local function prepareOpen(src, openedBy)
         return nil, Msg.configError
     end
 
+    if requireNear and not isNearPed(src) then return nil, Msg.tooFar end
+
     local token = randomToken()
-    sessions[src] = { token = token, citizenid = citizenid }
+    sessions[src] = { token = token, citizenid = citizenid, requireNear = requireNear == true }
 
     return buildUiPayload(row, token, openedBy)
 end
@@ -500,14 +512,27 @@ local function canOpenNow(src)
     return true
 end
 
--- Client asks after its own readiness checks (auto-open), or via the
--- OpenIfEligible export. Silent on failure so auto-open never spams notifications.
-lib.callback.register('velora_starterpack:server:requestOpen', function(src, isAuto)
-    if isAuto == true and not Config.AutoOpen.enabled then return nil end
-    if not canOpenNow(src) then return nil end
+-- reason: 'ped'    -> player interacted with the starter pack ped (proximity enforced)
+--         'auto'   -> automatic open after spawn (only in AutoOpen mode 'menu')
+--         'export' -> OpenIfEligible client export
+-- Returns payload, or nil + message (the client only shows messages for 'ped').
+lib.callback.register('velora_starterpack:server:requestOpen', function(src, reason)
+    if reason == 'auto' and not (Config.AutoOpen.enabled and Config.AutoOpen.mode == 'menu') then return nil end
+    if reason == 'ped' and not Config.Ped.enabled then return nil end
+    if reason ~= 'ped' and reason ~= 'auto' and reason ~= 'export' then return nil end
+    if not canOpenNow(src) then return nil, Msg.cooldown end
 
-    local payload = prepareOpen(src, nil)
-    return payload
+    return prepareOpen(src, nil, reason == 'ped')
+end)
+
+-- Used by AutoOpen mode 'notify': is this character still eligible?
+lib.callback.register('velora_starterpack:server:isEligible', function(src)
+    if not Config.Enabled or not dbReady then return false end
+    local player, citizenid = getPlayer(src)
+    if not player then return false end
+    local row, err = getClaim(citizenid)
+    if err then return false end
+    return not row or row.status ~= 'completed'
 end)
 
 -- Client-side config (only what the client needs, no reward data).
@@ -517,6 +542,10 @@ lib.callback.register('velora_starterpack:server:getClientConfig', function()
         debug = Config.Debug,
         autoOpen = Config.AutoOpen,
         command = Config.Command,
+        ped = Config.Ped,
+        visitPedMessage = Msg.visitPed,
+        notifyTitle = Config.Notify.title,
+        notifyPosition = Config.Notify.position,
         admin = { commands = Config.Admin.commands },
     }
 end)
@@ -537,7 +566,7 @@ if Config.Command.enabled then
             return
         end
 
-        local payload, errMsg = prepareOpen(src, nil)
+        local payload, errMsg = prepareOpen(src, nil, Config.Ped.enabled)
         if not payload then
             notify(src, errMsg, errMsg == Msg.alreadyClaimed and 'inform' or 'error')
             return
@@ -832,6 +861,10 @@ lib.callback.register('velora_starterpack:server:claim', function(src, data)
         return fail('session', Msg.notLoaded)
     end
 
+    if session.requireNear and not isNearPed(src) then
+        return fail('too_far', Msg.tooFar)
+    end
+
     if processingSrc[src] or processingCid[citizenid] then
         return fail('busy', Msg.busy)
     end
@@ -990,7 +1023,9 @@ RegisterCommand(Config.Admin.commands.reset, function(src, args)
     reply(src, ('Starter pack eligibility reset for %s. Previously granted items/money were NOT removed.'):format(label), 'success')
     if online then
         sessions[online] = nil
-        notify(online, ('Staff have reset your starter pack. Use /%s to choose again.'):format(Config.Command.name), 'inform')
+        notify(online, Config.Ped.enabled
+            and 'Staff have reset your starter pack. Visit the welcome host at the Legion Square car park to choose again.'
+            or ('Staff have reset your starter pack. Use /%s to choose again.'):format(Config.Command.name), 'inform')
     end
 end, false)
 

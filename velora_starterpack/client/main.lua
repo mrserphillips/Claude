@@ -143,7 +143,26 @@ local function scheduleAutoOpen()
         if not waitUntilSafe(gen, cfg.autoOpen.maxWait) then return end
         if gen ~= autoOpenGen or uiOpen then return end
 
-        local ok, payload = pcall(lib.callback.await, 'velora_starterpack:server:requestOpen', false, true)
+        -- 'notify' mode: point the new character at the starter pack ped.
+        if cfg.autoOpen.mode ~= 'menu' then
+            local ok, eligible = pcall(lib.callback.await, 'velora_starterpack:server:isEligible', false)
+            if not ok or not eligible or gen ~= autoOpenGen then return end
+
+            lib.notify({
+                title = cfg.notifyTitle,
+                description = cfg.visitPedMessage,
+                type = 'inform',
+                position = cfg.notifyPosition,
+                duration = cfg.autoOpen.notifyDuration or 12000,
+                icon = 'gift',
+            })
+            if cfg.autoOpen.setWaypoint and cfg.ped and cfg.ped.enabled then
+                SetNewWaypoint(cfg.ped.coords.x, cfg.ped.coords.y)
+            end
+            return
+        end
+
+        local ok, payload = pcall(lib.callback.await, 'velora_starterpack:server:requestOpen', false, 'auto')
         if not ok or not payload then
             dbg('Not eligible for auto-open (already claimed or disabled)')
             return
@@ -203,6 +222,148 @@ RegisterNetEvent('velora_starterpack:client:open', function(payload)
 
     openUI(payload)
 end)
+
+---------------------------------------------------------------------------
+-- Starter pack ped (Legion Square car park)
+-- The ped is local to each client and only exists while the player is nearby.
+---------------------------------------------------------------------------
+local pedState = { entity = nil, blip = nil, points = {}, textUI = false, useTarget = false }
+
+local function openFromPed()
+    if uiOpen or claimInFlight then return end
+    local ok, payload, errMsg = pcall(lib.callback.await, 'velora_starterpack:server:requestOpen', false, 'ped')
+    if ok and payload then
+        openUI(payload)
+    elseif ok and errMsg then
+        lib.notify({ title = cfg.notifyTitle, description = errMsg, type = 'inform', position = cfg.notifyPosition })
+    end
+end
+
+local function despawnPed()
+    local ped = pedState.entity
+    pedState.entity = nil
+    if ped and DoesEntityExist(ped) then
+        if pedState.useTarget then
+            pcall(function() exports.ox_target:removeLocalEntity(ped, 'velora_starterpack') end)
+        end
+        DeleteEntity(ped)
+    end
+end
+
+local function spawnPed()
+    if pedState.entity and DoesEntityExist(pedState.entity) then return end
+    local pc = cfg.ped
+    local model = type(pc.model) == 'string' and joaat(pc.model) or pc.model
+
+    local loaded = pcall(lib.requestModel, model, 10000)
+    if not loaded then
+        print(('^1[%s] Could not load ped model %s^7'):format(RESOURCE, tostring(pc.model)))
+        return
+    end
+
+    -- coords.z is player standing height (as /coords reports); peds spawn 1m lower.
+    local ped = CreatePed(4, model, pc.coords.x, pc.coords.y, pc.coords.z - 1.0, pc.coords.w, false, true)
+    SetModelAsNoLongerNeeded(model)
+    if not ped or ped == 0 then return end
+
+    SetEntityHeading(ped, pc.coords.w)
+    FreezeEntityPosition(ped, true)
+    SetEntityInvincible(ped, true)
+    SetBlockingOfNonTemporaryEvents(ped, true)
+    SetPedCanRagdoll(ped, false)
+    SetPedFleeAttributes(ped, 0, false)
+    SetPedDiesWhenInjured(ped, false)
+    SetEntityAsMissionEntity(ped, true, true)
+    if pc.scenario then
+        TaskStartScenarioInPlace(ped, pc.scenario, 0, true)
+    end
+
+    pedState.entity = ped
+
+    if pedState.useTarget then
+        exports.ox_target:addLocalEntity(ped, {
+            {
+                name = 'velora_starterpack',
+                label = pc.targetLabel,
+                icon = pc.targetIcon,
+                distance = pc.interactDistance,
+                onSelect = openFromPed,
+                canInteract = function() return not uiOpen end,
+            },
+        })
+    end
+end
+
+local function hideTextUI()
+    if pedState.textUI then
+        pedState.textUI = false
+        lib.hideTextUI()
+    end
+end
+
+local function setupPed()
+    local pc = cfg.ped
+    if not pc or not pc.enabled then return end
+
+    local mode = pc.interaction
+    if mode == 'auto' then
+        mode = GetResourceState('ox_target') == 'started' and 'ox_target' or 'textui'
+    end
+    pedState.useTarget = mode == 'ox_target'
+
+    local center = vec3(pc.coords.x, pc.coords.y, pc.coords.z)
+
+    pedState.points[#pedState.points + 1] = lib.points.new({
+        coords = center,
+        distance = pc.spawnDistance,
+        onEnter = spawnPed,
+        onExit = despawnPed,
+    })
+
+    if not pedState.useTarget then
+        pedState.points[#pedState.points + 1] = lib.points.new({
+            coords = center,
+            distance = pc.interactDistance,
+            onExit = hideTextUI,
+            -- Only runs while the player is within interactDistance of the ped.
+            nearby = function()
+                if uiOpen then
+                    hideTextUI()
+                    return
+                end
+                if not pedState.textUI then
+                    pedState.textUI = true
+                    lib.showTextUI(pc.textUI, { icon = 'gift' })
+                end
+                if IsControlJustReleased(0, pc.textUIKey) then
+                    hideTextUI()
+                    openFromPed()
+                end
+            end,
+        })
+    end
+
+    if pc.blip and pc.blip.enabled then
+        local blip = AddBlipForCoord(pc.coords.x, pc.coords.y, pc.coords.z)
+        SetBlipSprite(blip, pc.blip.sprite)
+        SetBlipColour(blip, pc.blip.color)
+        SetBlipScale(blip, pc.blip.scale)
+        SetBlipAsShortRange(blip, true)
+        BeginTextCommandSetBlipName('STRING')
+        AddTextComponentSubstringPlayerName(pc.blip.label)
+        EndTextCommandSetBlipName(blip)
+        pedState.blip = blip
+    end
+end
+
+local function cleanupPed()
+    for _, point in ipairs(pedState.points) do point:remove() end
+    pedState.points = {}
+    hideTextUI()
+    despawnPed()
+    if pedState.blip and DoesBlipExist(pedState.blip) then RemoveBlip(pedState.blip) end
+    pedState.blip = nil
+end
 
 ---------------------------------------------------------------------------
 -- NUI callbacks
@@ -285,7 +446,7 @@ end)
 -- if the current character is still eligible. Returns true if it opened.
 exports('OpenIfEligible', function()
     if uiOpen then return true end
-    local ok, payload = pcall(lib.callback.await, 'velora_starterpack:server:requestOpen', false, false)
+    local ok, payload = pcall(lib.callback.await, 'velora_starterpack:server:requestOpen', false, 'export')
     if ok and payload and not IsNuiFocused() then
         openUI(payload)
         return true
@@ -332,6 +493,8 @@ CreateThread(function()
     TriggerEvent('chat:addSuggestion', '/' .. admin.reset, 'Admin: reset starter pack eligibility', { { name = 'id', help = 'Server ID or citizenid' }, { name = 'confirm', help = 'Type "confirm" to proceed' } })
     TriggerEvent('chat:addSuggestion', '/' .. admin.give, 'Admin: open the starter pack menu for a player', { { name = 'id', help = 'Server ID' } })
 
+    setupPed()
+
     if cfg.autoOpen.onResourceRestart and LocalPlayer.state.isLoggedIn then
         scheduleAutoOpen()
     end
@@ -344,4 +507,5 @@ AddEventHandler('onResourceStop', function(name)
         SendNUIMessage({ action = 'close' })
     end
     releaseFocus()
+    cleanupPed()
 end)

@@ -24,9 +24,55 @@ Config.Debug = false
 ---------------------------------------------------------------------------
 -- AUTOMATIC OPENING
 ---------------------------------------------------------------------------
-Config.AutoOpen = {
-    -- Open the menu automatically for characters that have not claimed yet.
+---------------------------------------------------------------------------
+-- STARTER PACK PED (Legion Square car park)
+-- Players walk up to this ped and interact with it to open the menu.
+---------------------------------------------------------------------------
+Config.Ped = {
     enabled = true,
+
+    model = 'a_f_y_bevhills_02',
+    -- Standing position (x, y, z = player standing height as /coords shows it,
+    -- w = heading). Default: beside
+    -- the Legion Square car park entrance (qbx_garages "Pillbox Garage Parking"
+    -- access point is at 218.66, -804.08). Adjust with /coords if needed.
+    coords = vec4(215.76, -810.12, 30.73, 335.0),
+    scenario = 'WORLD_HUMAN_CLIPBOARD', -- set to false for a plain idle stance
+
+    -- The ped only exists on a client while they are within this range.
+    spawnDistance = 60.0,
+
+    -- 'ox_target' (third-eye) or 'textui' ([E] prompt). 'auto' uses ox_target
+    -- when it is running, otherwise the [E] prompt.
+    interaction = 'auto',
+    targetLabel = 'Velora Welcome Pack',
+    targetIcon = 'fa-solid fa-gift',
+    interactDistance = 2.5,
+    textUI = '[E] Velora Welcome Pack',
+    textUIKey = 38, -- E
+
+    -- SERVER-SIDE: menus opened at the ped can only be opened / claimed while
+    -- the player is physically within this many metres of the ped.
+    requireNearby = true,
+    maxServerDistance = 8.0,
+
+    blip = {
+        enabled = true,
+        sprite = 280,
+        color = 8, -- pink
+        scale = 0.8,
+        label = 'Velora Welcome Pack',
+    },
+}
+
+Config.AutoOpen = {
+    -- What happens when an unclaimed character finishes creation and spawns:
+    --   'notify' = tell them to visit the starter pack ped (and set a GPS waypoint)
+    --   'menu'   = open the menu automatically wherever they are
+    enabled = true,
+    mode = 'notify',
+    setWaypoint = true,
+    notifyDuration = 12000,
 
     -- Delay (ms) after the player has loaded before we start checking whether
     -- it is safe to open. Gives multicharacter / spawn / appearance resources
@@ -73,8 +119,10 @@ Config.AutoOpen = {
 }
 
 -- Allow unclaimed players to open the menu with a command.
+-- With the ped enabled this is off by default, so the ped is the only way
+-- to claim. If enabled while the ped exists, /starterpack only works near it.
 Config.Command = {
-    enabled = true,
+    enabled = false,
     name = 'starterpack',
 }
 
@@ -234,7 +282,7 @@ Config.UI = {
         finishButton   = 'WELCOME TO VELORA',
         resumeNotice   = 'Your path has been chosen. Make space in your inventory and continue to collect your remaining rewards.',
         resumeButton   = 'COLLECT MY REWARDS',
-        closeHint      = 'Press ESC to decide later — use /starterpack to return.',
+        closeHint      = 'Press ESC to decide later — come back to the welcome host any time.',
         cashLabel      = 'Cash',
         bankLabel      = 'Bank',
     },
@@ -258,11 +306,13 @@ Config.Notify = {
         invalidPath     = 'That path does not exist.',
         pathLocked      = 'You have already chosen the %s path.',
         configError     = 'The starter pack is temporarily unavailable. Please contact staff.',
-        inventoryFull   = 'Not enough inventory space. You need %s free slot(s) and %.1fkg of free weight. Make space and use /starterpack to try again.',
-        grantFailed     = 'Some rewards could not be delivered. Nothing was duplicated — make space and use /starterpack to collect the rest.',
+        inventoryFull   = 'Not enough inventory space. You need %s free slot(s) and %.1fkg of free weight. Make space and speak to the welcome host again.',
+        grantFailed     = 'Some rewards could not be delivered. Nothing was duplicated — make space and speak to the welcome host to collect the rest.',
         success         = 'Welcome to Velora City! Your %s starter pack has been delivered.',
         needsReview     = 'Your starter pack is complete, but one reward needs staff review. Please open a ticket.',
         dbError         = 'A database error occurred. Please try again shortly.',
         noPermission    = 'You do not have permission to do that.',
+        tooFar          = 'You need to be with the Velora welcome host at the Legion Square car park.',
+        visitPed        = 'Welcome to Velora City! Collect your free starter pack from the welcome host at the Legion Square car park — it is marked on your GPS.',
     },
 }
