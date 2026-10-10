@@ -6,6 +6,7 @@ A drop-in QBX/Qbox in-city job builder for Missy's House. v2 keeps the working v
 
 - Customer storefront rebuilt to match the Luna Leaf reference layout: circular leaf crest, handwritten header line, line-icon category rail, neon-leaf promo card, featured product card, square-button quantity steppers, trash-icon bag rows, payment-method box and lock/arrow checkout button.
 - Product grid and bag list scroll inside a fixed-size window; layout adapts down to 1366×768.
+- Categories: Seeds, Soil, Fertilizer, Edibles (any brownie or cake item), Tools (pots, baggies, plant revive, watering can and anything else).
 - Missing ox_inventory images hide cleanly instead of showing a broken-image icon; product hearts toggle locally.
 - Uses Cormorant Garamond, Crimson Pro and La Belle Aurore from Google Fonts, falling back to Georgia/cursive when offline.
 

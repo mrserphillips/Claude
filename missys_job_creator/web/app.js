@@ -104,13 +104,13 @@ function shopItems(shop){return (shop?.items||[]).map(i=>({
   unlimited:Boolean(i.unlimited),
   image:String(i.image||`${i.name||i.item_name}.png`)
 })).filter(i=>i.name)}
-function categoriseItem(item){const n=`${item.name} ${item.label}`.toLowerCase();if(n.includes('seed'))return 'seeds';if(n.includes('soil'))return 'soil';if(n.includes('fert'))return 'fertilizer';if(n.includes('pot'))return 'pots';return 'tools';}
+function categoriseItem(item){const n=`${item.name} ${item.label}`.toLowerCase();if(/brownie|cake/.test(n))return 'edibles';if(n.includes('seed'))return 'seeds';if(n.includes('soil'))return 'soil';if(n.includes('fert'))return 'fertilizer';return 'tools';}
 const SHOP_ICONS={
  all:'<svg viewBox="0 0 32 32"><path d="M16 28C8 24 6 15 10 9c2-3 6-5 10-6-1 4-1 7 0 11 2 6 1 11-4 14Z"/><path d="M16 28c-2-7-3-13-1-20"/><path d="M15.5 14l-3.5-3M15.4 19.5l-4.5-3.5M16 12l3-3"/></svg>',
  seeds:'<svg viewBox="0 0 32 32"><path d="M6 25C6 14 13 7 26 6c0 12-7 19-20 19Z"/><path d="M6 25 20 12"/><path d="M11 20h5M14 16.5h5"/></svg>',
  soil:'<svg viewBox="0 0 32 32"><path d="M3 22c3-7 8-10 13-10s10 3 13 10H3Z"/><path d="M3 22h26"/><path d="M10 18c2-2 4-3 6-3"/></svg>',
  fertilizer:'<svg viewBox="0 0 32 32"><path d="M12 4h8v4h-8z"/><path d="M11 8h10l2 4v15a2 2 0 0 1-2 2H11a2 2 0 0 1-2-2V12l2-4Z"/><path d="M16 25c-3-2-3-5-1-8 1 0 3 0 4-1 0 4-1 7-3 9Z"/><path d="M16 25c0-2 .5-4 1.5-6"/></svg>',
- pots:'<svg viewBox="0 0 32 32"><path d="M5 9h22v4H5z"/><path d="M7 13l2.5 15h13L25 13"/></svg>',
+ edibles:'<svg viewBox="0 0 32 32"><path d="M6 16h20l-2.5 11h-15L6 16Z"/><path d="M11 16l1 11M16 16v11M21 16l-1 11"/><path d="M6 16c0-5 4.5-8 10-8s10 3 10 8"/><path d="M16 8V5"/><circle cx="16" cy="4" r="1.2"/></svg>',
  tools:'<svg viewBox="0 0 32 32"><path d="M8 13h14v10a3 3 0 0 1-3 3h-8a3 3 0 0 1-3-3V13Z"/><path d="M8 16H5a2 2 0 0 0-2 2v1a4 4 0 0 0 4 4h1"/><path d="M22 16l7-6"/><path d="M27 8l3 3"/><path d="M11 13v-2a4 4 0 0 1 8 0v2"/><path d="M15 23c-2-1-2-3-1-5l2-1c0 2 0 4-1 6Z"/></svg>',
  heart:'<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg>',
  leaf:'<svg viewBox="0 0 24 24"><path d="M12 21c-5-3-6-9-3-13 2-3 6-5 9-5-1 3-1 6 0 9 1 5-1 8-6 9Z"/><path d="M12 21c-1-5-1-10 2-15"/></svg>',
@@ -120,7 +120,7 @@ const SHOP_ICONS={
 };
 const shopIcon=key=>SHOP_ICONS[key]||SHOP_ICONS.all;
 const shopImg=(image,label)=>`<img src="nui://ox_inventory/web/images/${encodeURIComponent(image)}" alt="${esc(label)}" onerror="this.onerror=null;this.classList.add('missing');this.removeAttribute('src')">`;
-function categoryMeta(luna=true){return[{key:'all',label:'All Products',sub:luna?'Browse our full collection':'Everything on the counter'},{key:'seeds',label:'Seeds',sub:'Start something new'},{key:'soil',label:'Soil',sub:'Nourish your roots'},{key:'fertilizer',label:'Fertilizer',sub:'Help them thrive'},{key:'pots',label:'Pots',sub:'A home for every plant'},{key:'tools',label:'Tools',sub:'For a greener tomorrow'}]}
+function categoryMeta(luna=true){return[{key:'all',label:'All Products',sub:luna?'Browse our full collection':'Everything on the counter'},{key:'seeds',label:'Seeds',sub:'Start something new'},{key:'soil',label:'Soil',sub:'Nourish your roots'},{key:'fertilizer',label:'Fertilizer',sub:'Help them thrive'},{key:'edibles',label:'Edibles',sub:'Sweet little treats'},{key:'tools',label:'Tools',sub:'For a greener tomorrow'}]}
 function filteredShopItems(shop){const items=shopItems(shop),search=String(ui.customerFilters.search||'').trim().toLowerCase(),category=ui.customerFilters.category||'all';let rows=items.filter(item=>{if(category!=='all'&&categoriseItem(item)!==category)return false;if(search&&!(`${item.name} ${item.label}`.toLowerCase().includes(search)))return false;return true});const sort=ui.customerFilters.sort||'featured';if(sort==='name')rows.sort((a,b)=>a.label.localeCompare(b.label));else if(sort==='price_asc')rows.sort((a,b)=>a.price-b.price||a.label.localeCompare(b.label));else if(sort==='price_desc')rows.sort((a,b)=>b.price-a.price||a.label.localeCompare(b.label));else rows.sort((a,b)=>{const af=categoriseItem(a)==='seeds'?0:1,bf=categoriseItem(b)==='seeds'?0:1;return af-bf||a.label.localeCompare(b.label)});return rows}
 function findCartLine(name){return(ui.customerCart||[]).find(line=>String(line.itemName)===String(name))||null}
 function cartItemCount(){return(ui.customerCart||[]).reduce((sum,line)=>sum+safeInt(line.qty,1,9999,1),0)}
