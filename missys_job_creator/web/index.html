@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Missy's Job Creator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Crimson+Pro:wght@400;500;600;700&family=La+Belle+Aurore&display=swap" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<main id="app" class="hidden" style="display: none;" aria-live="polite">
+  <section id="adminShell" class="shell hidden">
+    <header class="topbar">
+      <div class="brandBlock"><p class="eyebrow">MISSY'S HOUSE · ADMIN TOOLS</p><h1>Job Creator <span>v2</span></h1><p class="subtitle">Build the job, then build the world around it.</p></div>
+      <button class="iconButton" data-action="close" aria-label="Close">×</button>
+    </header>
+    <nav class="tabs" aria-label="Creator sections">
+      <button data-tab="jobs">Jobs</button><button data-tab="points">World Points</button><button data-tab="npcs">NPCs</button><button data-tab="businesses">Businesses</button><button data-tab="integrations">Integrations</button>
+    </nav>
+    <div class="workspace">
+      <aside class="listPane">
+        <div class="listHeader"><div><p class="eyebrow">CREATOR</p><h2 id="listTitle">Jobs</h2></div><button class="primary small" data-action="new">+ New</button></div>
+        <div id="filterBar" class="filterBar">
+          <input id="searchInput" placeholder="Search…" autocomplete="off">
+          <select id="enabledFilter"><option value="all">All status</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option></select>
+          <select id="jobFilter"><option value="">All jobs</option></select>
+          <select id="typeFilter"><option value="all">All types</option></select>
+        </div>
+        <div id="entityList" class="entityList"></div>
+      </aside>
+      <section id="editorPane" class="editorPane"></section>
+    </div>
+  </section>
+
+  <section id="shopShell" class="shopShell hidden" data-theme="velora">
+    <div class="shopDecor shopDecorTL" aria-hidden="true"></div>
+    <div class="shopDecor shopDecorBR" aria-hidden="true"></div>
+    <header class="shopHeader">
+      <div class="shopIdentity">
+        <div class="lunaLeafMark" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M33 54C18 47 15 30 22 18c4-7 11-11 18-12-3 7-2 13 1 20 4 10 2 21-8 28Z"/><path d="M33 54c-4-12-6-24-3-36"/><path d="M33 54c9-6 15-15 15-26 0-6-2-11-5-15"/></svg></div>
+        <div class="shopBrandCopy">
+          <p class="shopKicker" id="customerShopKicker">VELORA · MARKETPLACE</p>
+          <h1 id="customerShopBrand">Shop</h1>
+          <p class="shopTagline" id="customerShopTitle">Counter service</p>
+        </div>
+      </div>
+      <div class="shopHeroCopy" id="customerShopMessage">Choose what you need. We’ll handle the rest.</div>
+      <div class="shopHeaderActions">
+        <div class="paymentChip"><svg class="shopIcon" viewBox="0 0 24 24"><path d="M12 21c-5-3-6-9-3-13 2-3 6-5 9-5-1 3-1 6 0 9 1 5-1 8-6 9Z"/><path d="M12 21c-1-5-1-10 2-15"/></svg><span id="customerShopPayment"></span></div>
+        <button class="shopClose" data-action="close" aria-label="Close shop"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+    </header>
+    <div class="shopLayout">
+      <aside class="shopSidebar">
+        <div id="customerShopCategories" class="shopCategories"></div>
+        <div id="customerShopPromo" class="shopPromoCard"></div>
+      </aside>
+      <section class="shopMain">
+        <div class="shopTools">
+          <label class="shopSearchField"><svg class="shopIcon" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><input id="customerShopSearch" type="text" placeholder="Search products..." autocomplete="off"></label>
+          <label class="shopSortField"><span>Sort by:</span><select id="customerShopSort"><option value="featured">Featured</option><option value="name">Name</option><option value="price_asc">Price: Low to high</option><option value="price_desc">Price: High to low</option></select><svg class="shopIcon shopSortChevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></label>
+        </div>
+        <div id="customerShopItems" class="shopGrid"></div>
+      </section>
+      <aside class="shopBagColumn">
+        <div class="shopBagPanel">
+          <div class="bagHeader">
+            <svg class="bagHeaderIcon" viewBox="0 0 24 24"><path d="M5 8h14l-1 13H6L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+            <h3>Your Bag</h3>
+            <div id="customerBagCount" class="bagCount">0</div>
+          </div>
+          <div id="customerBagItems" class="bagItems"></div>
+          <div id="customerBagEmpty" class="bagEmptyState">Add items to your bag to check out.</div>
+          <div class="bagAffirmation"><svg class="bagAffirmationMark" viewBox="0 0 64 64"><path d="M33 54C18 47 15 30 22 18c4-7 11-11 18-12-3 7-2 13 1 20 4 10 2 21-8 28Z"/><path d="M33 54c-4-12-6-24-3-36"/></svg><div><span id="customerBagAffirmA">Good plants.</span><span id="customerBagAffirmB">Better days.</span></div></div>
+          <div class="bagSummary">
+            <div class="bagSummaryRow"><span>Subtotal</span><strong id="customerBagSubtotal">$0</strong></div>
+            <p class="bagPaymentLabel">Payment Method</p>
+            <div class="bagPaymentRow"><svg class="shopIcon" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg><strong id="customerBagPaymentSummary">Cash</strong><span id="customerBagPaymentStock">∞ stock</span></div>
+            <button id="customerCheckout" class="checkoutButton" data-action="checkout" disabled><svg class="checkoutLock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg><span>Checkout</span><svg class="shopIcon checkoutArrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </div>
+        </div>
+        <p class="shopFooterNote" id="customerShopFooter">From roots to a brighter tomorrow.</p>
+      </aside>
+    </div>
+  </section>
+
+  <section id="confirmModal" class="modalBackdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modalCard"><p class="eyebrow" id="modalKicker">CONFIRM ACTION</p><h2 id="modalTitle"></h2><p id="modalMessage" class="subtitle"></p><div id="modalDetails" class="modalDetails"></div><div class="modalActions"><button class="ghost" data-action="modalCancel">Cancel</button><button id="modalConfirmButton" class="danger" data-action="modalConfirm">Confirm</button></div></div>
+  </section>
+  <div id="toast" class="toast hidden" role="status"></div>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
