@@ -7,6 +7,33 @@ Every minigame can use painted or photographed artwork instead of the built-in d
 - **To see new art:** restart the resource (`ensure velora_jamco`). You don't need to rebuild anything.
 - **Sizing guides:** `install/art-templates/` has a template PNG for every file. Each one is the exact size to deliver, with pink and blue guides showing where the game paints jam and where pivot points sit. Give these templates to whoever makes the images.
 
+## Art already included
+Your painted set is already in the game:
+
+| Stage | Files |
+|---|---|
+| Preparation | `prepare/board.png` (board); cut fruit `fruit/<fruit>_cut.png` for strawberry, apple, peach, orange and lemon |
+| Cooking | `heat/pot.png` (copper pot), plus `heat/pot_front.png`, which is the same pot with the opening cut out |
+| Stirring | Shares `heat/pot.png` in a 3/4 view; spoon is `stir/spoon.png` |
+| Filling | `fill/jar.png` (glass made see-through), `fill/pour_pot.png` and `fill/pour_stream.png` (tipped pot and its jam stream) |
+| Orchard | `harvest/branch.png`; ripe, `_unripe` and `_rotten` versions of strawberry, apple, peach, orange, lemon, raspberry, blackberry, cherry and blueberry |
+
+**How the game uses it:**
+- The jam in every pot, stream and jar is recoloured to each recipe's colour, so orange marmalade looks orange.
+- Floating fruit pieces in the pot use your fruit art.
+
+**Still missing (built-in drawing or icon is used for now):**
+
+| Missing | Files that would fill the gap |
+|---|---|
+| Plum | `plum.png`, `plum_unripe.png`, `plum_rotten.png`, `plum_cut.png` |
+| Cut berries and cherries | `_cut` versions of raspberry, blackberry, blueberry and cherry (optional) |
+| Golden fruit | `fruit/golden.png` |
+| Lid, seen from directly above | `seal/lid.png` |
+| Gas burner under the pot | `heat/stove.png`, 960 × 220 |
+| Backgrounds | `kitchen_bg.jpg`, `harvest/bg.jpg` |
+| Basket | `harvest/basket.png` |
+
 ## Format rules
 - **`.png` files:**
   - Must have a **transparent background**.

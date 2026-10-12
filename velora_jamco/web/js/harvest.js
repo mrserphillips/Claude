@@ -157,7 +157,7 @@ VJ.apps.harvest = (() => {
     /* ── Drawing ──────────────────────────────────────────────────────── */
     // Draws a straight branch image bent along the branch curve, slice by slice
     function drawBranchSprite(b, img) {
-        const N = 28;
+        const N = 64;
         const thick = ART_LAYOUT.harvest.branchThickness * (b.w / 22);
         const pt = (t) => ({
             x: (1 - t) * (1 - t) * b.x0 + 2 * (1 - t) * t * b.cx + t * t * b.x1,
@@ -169,11 +169,11 @@ VJ.apps.harvest = (() => {
             const a = pt(t0), c = pt(t1);
             const len = Math.hypot(c.x - a.x, c.y - a.y) + 1.5;
             const ang = Math.atan2(c.y - a.y, c.x - a.x);
-            const si = flip ? N - 1 - i : i;
+            const si = i; // base of the image always starts at the branch base
             ctx.save();
             ctx.translate(a.x, a.y); ctx.rotate(ang);
             if (flip) ctx.scale(1, -1);
-            ctx.drawImage(img, si / N * img.width, 0, img.width / N, img.height, 0, -thick / 2, len, thick);
+            ctx.drawImage(img, si / N * img.width, 0, img.width / N + 1, img.height, 0, -thick / 2, len + 1, thick);
             ctx.restore();
         }
     }
@@ -312,7 +312,7 @@ VJ.apps.harvest = (() => {
 
     function loop(now) {
         if (!st) return;
-        const dt = Math.min(0.05, (now - st.last) / 1000);
+        const dt = Math.max(0, Math.min(0.05, (now - st.last) / 1000));
         st.last = now;
         if (started && !ended) update(dt);
         draw(now);

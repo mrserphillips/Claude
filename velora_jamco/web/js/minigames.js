@@ -61,6 +61,38 @@ function stageBackdrop(ctx, key) {
     ctx.fillStyle = v; ctx.fillRect(0, 0, MW, MH);
 }
 
+/* Floating fruit pieces in the jam (uses fruit/<id>_cut.png, fruit/<id>.png or the item icon) */
+function makeChunks(info, n) {
+    return Array.from({ length: n }, (_, i) => {
+        const f = info.fruits[i % info.fruits.length];
+        return { id: f.id, item: f.item, a: Math.random() * Math.PI * 2, r: 0.15 + Math.sqrt(Math.random()) * 0.68, s: 0.7 + Math.random() * 0.5, rot: Math.random() * 6, ph: Math.random() * 6 };
+    });
+}
+function drawChunks(ctx, chunks, g, spin, size, now, jam, sink = 0) {
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, g.rx, g.ry, 0, 0, 7); ctx.clip();
+    const flat = g.ry / g.rx;
+    for (const c of chunks) {
+        const img = Art.fruit(c.id, 'cut') || Art.fruit(c.id) || loadImage(itemImg(c.item));
+        if (!img.complete && !(img instanceof HTMLCanvasElement)) continue;
+        const ang = c.a + spin * (1.2 - c.r * 0.5);
+        const x = g.x + Math.cos(ang) * c.r * g.rx;
+        const y = g.y + Math.sin(ang) * c.r * g.ry + Math.sin(now / 600 + c.ph) * 1.5;
+        const sz = size * c.s * (0.85 + 0.15 * (y - g.y + g.ry) / (2 * g.ry)); // nearer = bigger
+        ctx.save();
+        ctx.translate(x, y); ctx.scale(1, Math.max(0.55, flat * 1.6)); ctx.rotate(c.rot + spin * 0.4);
+        ctx.globalAlpha = 0.95 - sink * 0.4;
+        ctx.drawImage(img, -sz / 2, -sz / 2, sz, sz);
+        ctx.restore();
+        // jam lapping over the lower part of each piece
+        ctx.globalAlpha = 0.45 + sink * 0.3;
+        ctx.fillStyle = rgb(jam);
+        ctx.beginPath(); ctx.ellipse(x, y + sz * 0.22, sz * 0.5, sz * 0.18, 0, 0, 7); ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+}
+
 const Minigames = {};
 
 /* ═══════════════ A: PREPARE — slice targets in sequence ═══════════════ */
@@ -75,8 +107,13 @@ Minigames.prepare = (host, p, info, done) => {
     for (let i = 0; i < N; i++) {
         const row = i < cols ? 0 : 1;
         const col = row === 0 ? i : i - cols;
-        const x = 200 + (col + 0.5) * (600 / cols) + (row ? 30 : -30);
-        const y = row === 0 ? 205 : 345;
+        let x = 200 + (col + 0.5) * (600 / cols) + (row ? 30 : -30);
+        let y = row === 0 ? 205 : 345;
+        if (Art.get('board')) {
+            const T = ART_LAYOUT.prepare.targets;
+            x = T.x0 + (col + 0.5) * ((T.x1 - T.x0) / cols) + (row ? 22 : -22);
+            y = row === 0 ? T.row1 : T.row2;
+        }
         const f = info.fruits[i % info.fruits.length];
         targets.push({ x, y, fid: f.id, img: imgs[i % imgs.length], state: 'wait', t: 0, cut: 0, angle: (Math.random() - .5) * 1.2 });
     }
@@ -115,7 +152,7 @@ Minigames.prepare = (host, p, info, done) => {
     }
 
     function frame(now) {
-        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
         if (idx < N) {
             const t = targets[idx];
             if (t.state === 'wait') { gap -= dt; if (gap <= 0) { t.state = 'active'; t.t = 0; } }
@@ -142,8 +179,9 @@ Minigames.prepare = (host, p, info, done) => {
             ctx.fillStyle = '#2a160a'; ctx.beginPath(); ctx.arc(805, 160, 12, 0, 7); ctx.fill();
         }
         // fruit
+        const boardArt = !!Art.get('board');
         targets.forEach((t, i) => {
-            const s = 92;
+            const s = boardArt ? ART_LAYOUT.prepare.targets.size : 92;
             const whole = Art.fruit(t.fid) || t.img;
             const cutImg = Art.fruit(t.fid, 'cut');
             if (t.state === 'cut' && cutImg) {
@@ -162,6 +200,10 @@ Minigames.prepare = (host, p, info, done) => {
                 ctx.restore();
             } else {
                 ctx.globalAlpha = t.state === 'missed' ? 0.45 : 1;
+                if (boardArt) {
+                    ctx.fillStyle = 'rgba(40,18,6,.35)';
+                    ctx.beginPath(); ctx.ellipse(t.x + 4, t.y + s * 0.42, s * 0.36, s * 0.09, 0, 0, 7); ctx.fill();
+                }
                 ctx.drawImage(whole, t.x - s / 2, t.y - s / 2, s, s);
                 ctx.globalAlpha = 1;
             }
@@ -217,12 +259,13 @@ Minigames.heat = (host, p, info, done) => {
     let temp = p.startTemp, burner = 0, holding = false, progress = 0, reached = false, raf = 0, last = performance.now(), finished = false;
     const ms = { inBand: 0, hot: 0, cold: 0, warm: 0 };
     const bubbles = [], steam = [];
+    const chunks = makeChunks(info, 12);
     const h = hud(host, `<span class="hint" id="hHint">Hold to heat, release to cool. Keep it in the <b class="pink">pink band</b>.</span>
         <button class="btn hold-btn" id="hold">🔥 Hold to Heat</button>`);
     const btn = $('#hold', h);
 
     function frame(now) {
-        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
         if (!finished) {
             burner += ((holding ? 1 : 0) - burner) * Math.min(1, dt * 1.4);
             temp += (burner * 10 - (temp - 20) * 0.05) * dt;
@@ -244,22 +287,30 @@ Minigames.heat = (host, p, info, done) => {
         stageBackdrop(ctx, 'heatBg');
         const cx = 500, cy = 250;
         const HL = ART_LAYOUT.heat;
+        const potImg = Art.get('pot');
         // stove top
         const stoveImg = Art.get('stove');
         if (stoveImg) ctx.drawImage(stoveImg, HL.stove.x, HL.stove.y, HL.stove.w, HL.stove.h);
-        else { ctx.fillStyle = '#1b1b1f'; roundRect(ctx, 300, 300, 400, 40, 10); ctx.fill(); }
+        else if (potImg) {
+            // cast-iron burner ring under the painted pot
+            const st = HL.stove;
+            const sg = ctx.createLinearGradient(0, st.y, 0, st.y + st.h);
+            sg.addColorStop(0, '#3a3438'); sg.addColorStop(1, '#121014');
+            ctx.fillStyle = sg; ctx.beginPath(); ctx.ellipse(cx, st.y + st.h / 2, st.w / 2, st.h / 2, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = '#0b090b'; ctx.beginPath(); ctx.ellipse(cx, st.y + st.h / 2 - 4, st.w / 2 - 30, st.h / 2 - 10, 0, 0, 7); ctx.fill();
+        } else { ctx.fillStyle = '#1b1b1f'; roundRect(ctx, 300, 300, 400, 40, 10); ctx.fill(); }
         // flames
         const fl = burner;
+        const flameY = potImg ? HL.flameY : 318, flameR = potImg ? HL.flameRadius : 110;
         for (let i = 0; i < 16; i++) {
             const a = i / 16 * Math.PI * 2;
-            const x = cx + Math.cos(a) * 110, y = 318 + Math.sin(a) * 10;
+            const x = cx + Math.cos(a) * flameR, y = flameY + Math.sin(a) * 10;
             const hgt = (10 + fl * 46) * (0.8 + Math.random() * 0.4);
             const g = ctx.createLinearGradient(x, y, x, y - hgt);
             g.addColorStop(0, 'rgba(80,140,255,.9)'); g.addColorStop(0.4, `rgba(255,${120 + fl * 60},40,.85)`); g.addColorStop(1, 'rgba(255,200,80,0)');
             ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y - hgt / 2, 8, hgt / 2, 0, 0, 7); ctx.fill();
         }
         // pot body (painted image, or drawn copper)
-        const potImg = Art.get('pot');
         if (potImg) {
             ctx.drawImage(potImg, HL.pot.x, HL.pot.y, HL.pot.w, HL.pot.h);
         } else {
@@ -273,21 +324,38 @@ Minigames.heat = (host, p, info, done) => {
         // jam surface (textured if jam_texture.jpg exists)
         const burnt = Math.min(1, ms.hot / (p.burnSeconds * 1000));
         const surf = [0, 1, 2].map((i) => jam[i] * (1 - burnt * 0.6));
-        const S = HL.surface;
+        const S = potImg ? HL.surface : ART_FALLBACK.heatSurface;
         ctx.beginPath(); ctx.ellipse(S.x, S.y, S.rx, S.ry, 0, 0, 7);
         JamPaint.fill(ctx, surf.map(Math.round), { x: S.x - S.rx, y: S.y - S.ry, w: S.rx * 2, h: S.ry * 2 }, now / 9000, 0);
-        const potFront = Art.get('potFront');
-        if (potFront) ctx.drawImage(potFront, HL.pot.x, HL.pot.y, HL.pot.w, HL.pot.h);
+        drawChunks(ctx, chunks, S, now / 9000, S.rx * 0.34, now, surf.map((v) => Math.round(v * 0.75)), Math.min(1, progress));
         // bubbles & steam scale with temperature
         const heat = clamp((temp - 60) / 60, 0, 1.4);
-        if (Math.random() < heat * 0.6) { bubbles.push({ x: S.x + (Math.random() - .5) * S.rx * 1.7, y: S.y + (Math.random() - .5) * S.ry * 1.3, r: 0, max: 4 + Math.random() * 9 }); if (Math.random() < 0.3) SFX.bubble(); }
-        if (Math.random() < heat * 0.35) steam.push({ x: S.x + (Math.random() - .5) * S.rx * 1.5, y: S.y - 14, r: 14 + Math.random() * 16, life: 1, vx: (Math.random() - .5) * 18 });
-        for (let i = bubbles.length - 1; i >= 0; i--) {
-            const b = bubbles[i]; b.r += dt * 18;
-            ctx.strokeStyle = rgb(surf.map((v) => Math.min(255, v + 70)), 0.8); ctx.lineWidth = 1.5;
-            ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r, b.r * 0.45, 0, 0, 7); ctx.stroke();
-            if (b.r >= b.max) bubbles.splice(i, 1);
+        if (Math.random() < heat * 0.7) {
+            const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.85;
+            bubbles.push({ x: S.x + Math.cos(a) * r * S.rx, y: S.y + Math.sin(a) * r * S.ry, r: 0, max: (3 + Math.random() * 8) * (S.rx / 148), pop: 0 });
+            if (Math.random() < 0.3) SFX.bubble();
         }
+        if (Math.random() < heat * 0.35) steam.push({ x: S.x + (Math.random() - .5) * S.rx * 1.5, y: S.y - 14, r: 14 + Math.random() * 16, life: 1, vx: (Math.random() - .5) * 18 });
+        const light = surf.map((v) => Math.min(255, v + 60));
+        for (let i = bubbles.length - 1; i >= 0; i--) {
+            const b = bubbles[i];
+            if (b.r < b.max) b.r += dt * 14;
+            else b.pop += dt * 6;
+            if (b.pop >= 1) { bubbles.splice(i, 1); continue; }
+            const ry = b.r * (S.ry / S.rx) * 1.4;
+            ctx.globalAlpha = 1 - b.pop;
+            if (b.pop > 0) {
+                ctx.strokeStyle = rgb(light, 0.7); ctx.lineWidth = 1.2;
+                ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r * (1 + b.pop), ry * (1 + b.pop), 0, 0, 7); ctx.stroke();
+            } else {
+                const g = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - ry * 0.4, 0, b.x, b.y, b.r);
+                g.addColorStop(0, 'rgba(255,255,255,.75)'); g.addColorStop(0.25, rgb(light, 0.9)); g.addColorStop(1, rgb(surf, 0.95));
+                ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r, ry, 0, 0, 7); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+        const potFront = Art.get('potFront');
+        if (potImg && potFront) ctx.drawImage(potFront, HL.pot.x, HL.pot.y, HL.pot.w, HL.pot.h);
         for (let i = steam.length - 1; i >= 0; i--) {
             const s = steam[i]; s.y -= dt * 60; s.x += s.vx * dt; s.r += dt * 16; s.life -= dt * 0.5;
             const col = burnt > 0.5 ? '60,55,55' : '255,255,255';
@@ -341,9 +409,17 @@ Minigames.stir = (host, p, info, done) => {
     const { ctx } = c;
     const jam = jamColour(info.fruits);
     const cx = 500, cy = 260, R = 205;
+    // with the painted pot the jam is seen in 3/4 perspective (an ellipse), otherwise from directly above
+    const persp = () => !!Art.get('pot');
+    const geom = () => {
+        if (!persp()) return { x: cx, y: cy, rx: R, ry: R };
+        const S = ART_LAYOUT.stir.surface;
+        return { x: S.x, y: S.y, rx: S.rx, ry: S.ry };
+    };
     let accum = 0, lastA = null, speed = 0, burn = 0, maxBurn = 0, burnInt = 0, goodT = 0, totalT = 0, raf = 0, last = performance.now(), finished = false;
     let mouse = null, moved = 0, keyStep = -1;
     const splash = [];
+    const chunks = makeChunks(info, 14);
     const KEYS = ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'];
     const h = hud(host, `<span class="hint">Move your mouse in <b class="pink">smooth circles</b> inside the pot, or tap <span class="kbd">↑</span><span class="kbd">→</span><span class="kbd">↓</span><span class="kbd">←</span> in rotation.</span><b id="sRev" style="font-family:Cinzel">0 / ${p.revolutions}</b>`);
 
@@ -363,9 +439,11 @@ Minigames.stir = (host, p, info, done) => {
     function onMove(e) {
         const q = c.fit.toLogical(e.clientX, e.clientY);
         mouse = q;
-        const r = Math.hypot(q.x - cx, q.y - cy);
-        if (r < 40 || r > R + 10) { lastA = null; return; }
-        const a = Math.atan2(q.y - cy, q.x - cx);
+        const g = geom();
+        const nx = (q.x - g.x) / g.rx, ny = (q.y - g.y) / g.ry;
+        const r = Math.hypot(nx, ny);
+        if (r < 0.18 || r > 1.12) { lastA = null; return; }
+        const a = Math.atan2(ny, nx);
         if (lastA !== null) {
             let da = a - lastA;
             while (da > Math.PI) da -= Math.PI * 2;
@@ -375,8 +453,69 @@ Minigames.stir = (host, p, info, done) => {
         lastA = a;
     }
 
+    // 3/4 view: painted pot, jam drawn in perspective, rim redrawn on top, spoon dipping into the jam
+    function drawPerspective(now, thick) {
+        const SL = ART_LAYOUT.stir;
+        const g = geom();
+        const pot = Art.get('pot'), front = Art.get('potFront');
+        ctx.drawImage(pot, SL.pot.x, SL.pot.y, SL.pot.w, SL.pot.h);
+        const base = jam.map((v) => Math.round(v * (1 - thick * 0.25)));
+        const flat = g.ry / g.rx;
+        ctx.save();
+        ctx.beginPath(); ctx.ellipse(g.x, g.y, g.rx, g.ry, 0, 0, 7); ctx.clip();
+        ctx.translate(g.x, g.y); ctx.scale(1, flat); ctx.rotate(accum * 0.6);
+        const tex = JamPaint.texture(base);
+        if (tex) { const sz = g.rx * 2.3; ctx.drawImage(tex, -sz / 2, -sz / 2, sz, sz); }
+        else { ctx.fillStyle = rgb(base); ctx.fillRect(-g.rx * 1.2, -g.rx * 1.2, g.rx * 2.4, g.rx * 2.4); }
+        for (let k = 0; k < 3; k++) {
+            ctx.strokeStyle = `rgba(255,255,255,${0.05 + thick * 0.08})`; ctx.lineWidth = (6 - k) / flat * 0.6;
+            ctx.beginPath();
+            for (let t = 0; t < 14; t += 0.1) { const r = (10 + t * 13) * g.rx / 205; const a = t + k * 2.1; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+            ctx.stroke();
+        }
+        if (burn > 0.05) {
+            const sg = ctx.createRadialGradient(0, 0, g.rx * 0.5, 0, 0, g.rx);
+            sg.addColorStop(0, 'rgba(20,8,4,0)'); sg.addColorStop(1, `rgba(20,8,4,${burn * 0.85})`);
+            ctx.fillStyle = sg; ctx.fillRect(-g.rx, -g.rx, g.rx * 2, g.rx * 2);
+        }
+        ctx.restore();
+        drawChunks(ctx, chunks, g, accum * 0.6, g.rx * 0.28, now, base.map((v) => Math.round(v * 0.75)), thick);
+        // gloss on the far side, darker near the front lip
+        const gl = ctx.createLinearGradient(0, g.y - g.ry, 0, g.y + g.ry);
+        gl.addColorStop(0, `rgba(255,255,255,${0.1 + thick * 0.12})`); gl.addColorStop(0.5, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(0,0,0,.25)');
+        ctx.fillStyle = gl; ctx.beginPath(); ctx.ellipse(g.x, g.y, g.rx, g.ry, 0, 0, 7); ctx.fill();
+        if (speed < 0.3 && !finished) {
+            ctx.strokeStyle = 'rgba(240,106,166,.6)'; ctx.setLineDash([10, 12]); ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.ellipse(g.x, g.y, g.rx * 0.62, g.ry * 0.62, 0, now / 400, now / 400 + Math.PI * 1.6); ctx.stroke(); ctx.setLineDash([]);
+        }
+        if (front) ctx.drawImage(front, SL.pot.x, SL.pot.y, SL.pot.w, SL.pot.h);
+        // spoon: bowl dipped at the stirring point, handle leaning out of the pot
+        let px, py;
+        const inside = mouse && Math.hypot((mouse.x - g.x) / g.rx, (mouse.y - g.y) / g.ry) < 0.95;
+        if (inside) { px = mouse.x; py = mouse.y; }
+        else { px = g.x + Math.cos(accum) * g.rx * 0.6; py = g.y + Math.sin(accum) * g.ry * 0.6; }
+        const spoon = Art.get('spoon');
+        const ripple = (now / 300) % 1;
+        ctx.strokeStyle = `rgba(255,255,255,${0.35 * (1 - ripple)})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(px, py, 20 + ripple * 26, (20 + ripple * 26) * flat, 0, 0, 7); ctx.stroke();
+        ctx.save();
+        ctx.translate(px, py); ctx.rotate(SL.spoon.lean + (px - g.x) / g.rx * 0.15);
+        if (spoon) {
+            const hgt = SL.spoon.height, wid = hgt * spoon.width / spoon.height;
+            ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 12; ctx.shadowOffsetX = 6;
+            ctx.drawImage(spoon, -wid / 2, -hgt * SL.spoon.bowlY, wid, hgt);
+        } else {
+            ctx.fillStyle = '#c99257'; ctx.fillRect(-7, -250, 14, 230);
+            ctx.fillStyle = '#b07a40'; ctx.beginPath(); ctx.ellipse(0, -10, 24, 34, 0, 0, 7); ctx.fill();
+        }
+        ctx.restore();
+        // jam lapping over the submerged bowl
+        ctx.fillStyle = rgb(base, 0.85);
+        ctx.beginPath(); ctx.ellipse(px, py + 6, 30, 30 * flat * 1.4, 0, 0, Math.PI); ctx.fill();
+    }
+
     function frame(now) {
-        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
         if (!finished) applyMotion(dt);
         const progress = Math.min(1, Math.abs(accum) / (Math.PI * 2) / p.revolutions);
         if (!finished) {
@@ -387,7 +526,7 @@ Minigames.stir = (host, p, info, done) => {
             const ideal = speed >= 0.45 && speed <= maxSpeed;
             totalT += dt;
             if (ideal) goodT += dt;
-            if (speed > maxSpeed && Math.random() < 0.5) splash.push({ x: cx + (Math.random() - .5) * 300, y: cy + (Math.random() - .5) * 300, vx: (Math.random() - .5) * 200, vy: -100 - Math.random() * 160, life: 1 });
+            if (speed > maxSpeed && Math.random() < 0.5) splash.push({ x: geom().x + (Math.random() - .5) * geom().rx * 1.4, y: geom().y + (Math.random() - .5) * geom().ry * 1.4, vx: (Math.random() - .5) * 200, vy: -100 - Math.random() * 160, life: 1 });
             burn = clamp(burn + p.burnRate * dt * (speed < 0.3 ? 1.6 : ideal ? -2.2 : -0.6), 0, 1);
             maxBurn = Math.max(maxBurn, burn);
             burnInt += burn * dt;
@@ -401,6 +540,10 @@ Minigames.stir = (host, p, info, done) => {
         c.clear();
         stageBackdrop(ctx, 'stirBg');
         const SL = ART_LAYOUT.stir;
+        const thick = progress;
+        if (persp()) {
+            drawPerspective(now, thick);
+        } else {
         // pot from above (painted image, or drawn copper rim)
         const potTop = Art.get('potTop');
         if (potTop) ctx.drawImage(potTop, SL.potTop.x, SL.potTop.y, SL.potTop.w, SL.potTop.h);
@@ -409,7 +552,6 @@ Minigames.stir = (host, p, info, done) => {
             rim.addColorStop(0, '#f5b07a'); rim.addColorStop(0.7, '#b55a26'); rim.addColorStop(1, '#4a200c');
             ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(cx, cy, R + 26, 0, 7); ctx.fill();
         }
-        const thick = progress;
         const base = jam.map((v) => v * (1 - thick * 0.25));
         const textured = !!Art.get('jamTexture');
         if (textured) {
@@ -449,9 +591,9 @@ Minigames.stir = (host, p, info, done) => {
         const sp = mouse && Math.hypot(mouse.x - cx, mouse.y - cy) < R + 10 ? mouse : { x: cx + Math.cos(accum) * 130, y: cy + Math.sin(accum) * 130 };
         const ang = Math.atan2(sp.y - cy, sp.x - cx);
         ctx.save(); ctx.translate(sp.x, sp.y); ctx.rotate(ang);
-        const spoonImg = Art.get('spoon');
+        const spoonImg = null; // stir/spoon.png is drawn upright in the 3/4 view; the top-down view uses the drawn spoon
         if (spoonImg) {
-            const k = SL.spoon;
+            const k = SL.spoonTop;
             ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
             ctx.drawImage(spoonImg, -k.w * k.headX, -k.h * k.headY, k.w, k.h);
         } else {
@@ -460,6 +602,7 @@ Minigames.stir = (host, p, info, done) => {
             ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(-6, -6, 18, 9, 0, 0, 7); ctx.fill();
         }
         ctx.restore();
+        }
         splash.forEach((s) => { s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 600 * dt; s.life -= dt * 2; ctx.globalAlpha = Math.max(0, s.life); ctx.fillStyle = rgb(jam); ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, 7); ctx.fill(); });
         ctx.globalAlpha = 1;
         // meters
@@ -499,14 +642,33 @@ Minigames.fill = (host, p, info, done) => {
     const jam = jamColour(info.fruits);
     let fill = 0, flow = 0, pouring = false, released = false, finished = false, raf = 0, last = performance.now();
     const drips = [];
-    const h = hud(host, `<span class="hint">Hold <span class="kbd">Space</span> or the button to pour. Release in the <b class="pink">perfect</b> zone — the ladle drips a little after you stop!</span>
+    const h = hud(host, `<span class="hint">Hold <span class="kbd">Space</span> or the button to pour. Release in the <b class="pink">perfect</b> zone — the pot keeps dripping briefly after you stop!</span>
         <button class="btn hold-btn" id="pour">Hold to Pour</button>`);
     const btn = $('#pour', h);
     const FL = ART_LAYOUT.fill;
-    const JX = FL.inside.x, JY = FL.inside.y, JW = FL.inside.w, JH = FL.inside.h;
+    const IN = Art.get('jar') ? FL.inside : ART_FALLBACK.fillInside;
+    const JX = IN.x, JY = IN.y, JW = IN.w, JH = IN.h;
+    // pouring pot stream, tinted to this recipe's colour (hue from the recipe, detail from the painting)
+    let tintedStream = null;
+    function streamTinted() {
+        const img = Art.get('pourStream');
+        if (!img) return null;
+        if (tintedStream) return tintedStream;
+        const c2 = document.createElement('canvas');
+        c2.width = img.width; c2.height = img.height;
+        const x = c2.getContext('2d');
+        x.drawImage(img, 0, 0);
+        x.globalCompositeOperation = 'color';
+        x.fillStyle = rgb(jam.map((v) => Math.round(v * 0.8)));
+        x.fillRect(0, 0, c2.width, c2.height);
+        x.globalCompositeOperation = 'destination-in';
+        x.drawImage(img, 0, 0);
+        tintedStream = c2;
+        return c2;
+    }
 
     function frame(now) {
-        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
         if (!finished) {
             const target = pouring && !released ? 1 : 0;
             flow += (target - flow) * Math.min(1, dt * (target ? 9 : 6));
@@ -540,7 +702,7 @@ Minigames.fill = (host, p, info, done) => {
         if (jarBack) ctx.drawImage(jarBack, FL.jar.x, FL.jar.y, FL.jar.w, FL.jar.h);
         const lv = JY + JH - clamp(fill, 0, 100) / 100 * JH;
         ctx.save();
-        roundRect(ctx, JX, JY, JW, JH, FL.inside.r); ctx.clip();
+        roundRect(ctx, JX, JY, JW, JH, IN.r); ctx.clip();
         const wobble = Math.sin(now / 120) * 1.5;
         if (Art.get('jamTexture')) {
             ctx.beginPath(); ctx.rect(JX, lv + wobble, JW, JY + JH - lv);
@@ -554,8 +716,32 @@ Minigames.fill = (host, p, info, done) => {
             ctx.fillStyle = jg; ctx.fillRect(JX, lv + wobble, JW, JY + JH - lv);
         }
         ctx.restore();
+        // stream from the painted pot, stretched down to the jam surface (behind the glass front)
+        const pourPot = Art.get('pourPot');
+        const P = FL.pour;
+        if (pourPot && flow > 0.02) {
+            const st = streamTinted();
+            if (st) {
+                const top = P.y + P.streamStart * P.scale;
+                const len = Math.max(20, lv - top);
+                ctx.globalAlpha = Math.min(1, flow * 1.4);
+                const w = st.width * P.scale * (0.75 + flow * 0.25);
+                ctx.drawImage(st, 0, P.streamStart, st.width, st.height - P.streamStart, P.x + (st.width * P.scale - w) / 2, top, w, len);
+                ctx.globalAlpha = 1;
+                // splash where the stream meets the jam
+                ctx.fillStyle = rgb(jam.map((v) => Math.round(v * 0.8)), 0.8 * flow);
+                ctx.beginPath(); ctx.ellipse(P.x + 291 * P.scale, lv + 2, 22 * flow, 5, 0, 0, 7); ctx.fill();
+            }
+        }
         if (jarImg) {
             ctx.drawImage(jarImg, FL.jar.x, FL.jar.y, FL.jar.w, FL.jar.h);
+            // glass reflections stay, but the jam keeps its rich colour through the glass
+            ctx.save();
+            roundRect(ctx, JX, JY, JW, JH, IN.r); ctx.clip();
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.fillStyle = rgb(jam.map((v) => Math.round(v * 0.85)));
+            ctx.fillRect(JX, lv + wobble, JW, JY + JH - lv);
+            ctx.restore();
         } else {
             ctx.fillStyle = 'rgba(230,220,235,.08)'; roundRect(ctx, JX, JY, JW, JH, 26); ctx.fill();
             ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 3; roundRect(ctx, JX, JY, JW, JH, 26); ctx.stroke();
@@ -563,6 +749,14 @@ Minigames.fill = (host, p, info, done) => {
             ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
             for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(JX + 6, JY - 6 - i * 8); ctx.lineTo(JX + JW - 6, JY - 4 - i * 8); ctx.stroke(); }
         }
+        if (pourPot) {
+            // tipped copper pot: rocks back up when you stop pouring
+            const tiltBack = (1 - flow) * P.idleTilt;
+            const px = P.x + P.pivotX * P.scale, py = P.y + P.pivotY * P.scale;
+            ctx.save(); ctx.translate(px, py); ctx.rotate(tiltBack); ctx.translate(-px, -py);
+            ctx.drawImage(pourPot, P.x, P.y, pourPot.width * P.scale, pourPot.height * P.scale);
+            ctx.restore();
+        } else {
         // ladle & stream
         const tilt = 0.25 + flow * 0.55;
         ctx.save(); ctx.translate(640, 70); ctx.rotate(-tilt);
@@ -580,6 +774,7 @@ Minigames.fill = (host, p, info, done) => {
             ctx.strokeStyle = rgb(jam, 0.95); ctx.lineWidth = 4 + flow * 12; ctx.lineCap = 'round';
             ctx.beginPath(); ctx.moveTo(588, 90); ctx.quadraticCurveTo(586, 130, JX + JW / 2 + 40, lv);
             ctx.stroke();
+        }
         }
         drips.forEach((d) => { d.vy += 500 * dt; d.y += d.vy * dt; ctx.fillStyle = rgb(jam); ctx.beginPath(); ctx.ellipse(d.x, d.y, 5, 8, 0, 0, 7); ctx.fill(); });
         ctx.font = '700 34px Cinzel'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe3f0';
@@ -628,7 +823,7 @@ Minigames.seal = (host, p, info, done) => {
     }
 
     function frame(now) {
-        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
         if (!finished) needle = (needle + speed * dt) % 360;
         cooldown = Math.max(0, cooldown - dt);
         lidRot += (lidTarget - lidRot) * Math.min(1, dt * 10);

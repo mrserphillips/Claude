@@ -23,13 +23,15 @@ const ART_FILES = {
     potFront: 'heat/pot_front.png',       // optional: front lip drawn OVER the jam for depth
     // C: stir
     stirBg: 'stir/bg.jpg',
-    potTop: 'stir/pot_top.png',
+    potTop: 'stir/pot_top.png',           // alternative top-down pot (used only if heat/pot.png is missing)
     spoon: 'stir/spoon.png',
     // D: fill
     fillBg: 'fill/bg.jpg',
     jarBack: 'fill/jar_back.png',         // optional: back wall of the jar (drawn behind the jam)
     jar: 'fill/jar.png',                  // glass jar drawn OVER the jam
     ladle: 'fill/ladle.png',
+    pourPot: 'fill/pour_pot.png',         // tipped pot used instead of the ladle
+    pourStream: 'fill/pour_stream.png',   // the jam stream falling from it
     // E: seal
     sealBg: 'seal/bg.jpg',
     jarTop: 'seal/jar_top.png',
@@ -41,20 +43,39 @@ const ART_FILES = {
 };
 
 const ART_LAYOUT = {
-    prepare: { board: { x: 150, y: 110, w: 700, h: 340 }, knife: { w: 220, h: 60, tipX: 0.08, tipY: 0.5 } },
-    heat: {
-        stove: { x: 260, y: 270, w: 480, h: 110 },
-        pot: { x: 300, y: 96, w: 400, h: 230 },          // whole pot image box
-        surface: { x: 500, y: 154, rx: 148, ry: 27 },    // the open top of the pot where jam shows
+    prepare: {
+        board: { x: 120, y: 118, w: 760, h: 261 },
+        // where fruit is laid out on the board image (two rows)
+        targets: { x0: 190, x1: 715, row1: 182, row2: 282, size: 84 },
+        knife: { w: 220, h: 60, tipX: 0.08, tipY: 0.5 },
     },
-    stir: { potTop: { x: 269, y: 29, w: 462, h: 462 }, surface: { x: 500, y: 260, r: 205 }, spoon: { w: 300, h: 80, headX: 0.13, headY: 0.5 } },
+    heat: {
+        pot: { x: 305, y: 58, w: 390, h: 300 },               // whole pot image box
+        surface: { x: 500, y: 149, rx: 148, ry: 61 },         // the open top of the pot where jam shows
+        stove: { x: 260, y: 345, w: 480, h: 50 },
+        flameY: 352, flameRadius: 120,
+    },
+    stir: {
+        pot: { x: 205, y: 30, w: 590, h: 454 },               // same pot image, larger
+        surface: { x: 500, y: 167, rx: 223, ry: 92 },
+        spoon: { height: 270, bowlY: 0.86, lean: 0.32 },      // bowl position as a fraction of spoon height
+        potTop: { x: 269, y: 29, w: 462, h: 462 }, surfaceTop: { x: 500, y: 260, r: 205 },
+        spoonTop: { w: 300, h: 80, headX: 0.13, headY: 0.5 },
+    },
     fill: {
-        jar: { x: 440, y: 92, w: 280, h: 352 },          // jar image box
-        inside: { x: 470, y: 140, w: 220, h: 290, r: 26 }, // where jam fills (inside the glass)
-        ladle: { w: 310, h: 110, pivotX: 50, pivotY: 55 },  // pivot = centre of the ladle bowl
+        jar: { x: 380, y: 200, w: 280, h: 297 },              // jar image box
+        inside: { x: 400, y: 271, w: 240, h: 208, r: 30 },    // where jam fills (inside the glass)
+        pour: { x: 456, y: 2, scale: 0.28, streamStart: 480, idleTilt: 0.45, pivotX: 300, pivotY: 300 },
+        ladle: { w: 310, h: 110, pivotX: 50, pivotY: 55 },
     },
     seal: { jarTop: { x: 250, y: 10, w: 500, h: 500 }, lid: { size: 380 } },
-    harvest: { branchThickness: 120, basket: { x: 830, y: 410, w: 150, h: 150 } },
+    harvest: { branchThickness: 150, basket: { x: 830, y: 410, w: 150, h: 150 } },
+};
+
+// Geometry used when the matching image is NOT present (the built-in drawings)
+const ART_FALLBACK = {
+    heatSurface: { x: 500, y: 154, rx: 148, ry: 27 },
+    fillInside: { x: 470, y: 140, w: 220, h: 290, r: 26 },
 };
 
 const Art = (() => {
@@ -146,6 +167,7 @@ const JamPaint = (() => {
         return off;
     }
     return {
+        texture: tinted,
         /** fill the current path (call ctx.beginPath()/ellipse/arc first) with jam */
         fill(ctx, color, box, rotation = 0, darken = 0) {
             const t = tinted(color);
@@ -171,3 +193,4 @@ const JamPaint = (() => {
 window.Art = Art;
 window.ART_LAYOUT = ART_LAYOUT;
 window.JamPaint = JamPaint;
+window.ART_FALLBACK = ART_FALLBACK;
