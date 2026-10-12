@@ -21,7 +21,13 @@
   - If a player crashed, their refund is queued and paid automatically the next time they log in.
 
 ## The UI looks old after an update
-FiveM caches UI files on each player's PC. Every UI file is versioned, so an update normally shows straight away. If you still see the old UI:
+Type **`/jamversion`** in game. It shows the server, client and UI versions, plus the folder the server is running from.
+- **All three versions match:** the UI is up to date.
+- **UI says "NOT REPORTED":** your PC is still showing a cached copy of the old UI.
+- **Server version is old, or the folder is wrong:** the server is running a different copy of the resource.
+
+The server console also prints `version X running from <folder>` when the resource starts. If you still see the old UI:
+1. **Use a clean copy.** Delete the old `velora_jamco` folder on the server completely, then copy in the new one. Copying over the top leaves old files behind, such as the old `web/index.html`. Also check you don't have a second copy of the resource in another folder.
 1. **Restart the resource properly.** Run `refresh`, then `ensure velora_jamco` in the server console. `refresh` is needed whenever `fxmanifest.lua` changes, and this update adds new image folders.
 2. **Clear the FiveM cache:** close FiveM, open `%localappdata%\FiveM\FiveM.app\data\`, delete the `cache`, `server-cache`, `server-cache-priv` and `nui-storage` folders, then reconnect.
 3. **Check the files:** make sure the server has the new files, including `web/js/art.js` and the `web/images/minigames/` folder.

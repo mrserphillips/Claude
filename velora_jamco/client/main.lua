@@ -272,3 +272,23 @@ AddEventHandler('onResourceStop', function(name)
     if name ~= GetCurrentResourceName() then return end
     deleteNpc()
 end)
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- /jamversion: shows which server, client script and UI builds are actually running
+-- ─────────────────────────────────────────────────────────────────────────
+local uiVersion = nil
+RegisterNUICallback('uiVersion', function(data, cb)
+    cb(1)
+    uiVersion = type(data) == 'table' and data.version or nil
+end)
+
+RegisterCommand('jamversion', function()
+    local clientVersion = GetResourceMetadata(GetCurrentResourceName(), 'version', 0) or '?'
+    local srv = lib.callback.await('velora_jamco:version', false) or {}
+    local ui = uiVersion or 'NOT REPORTED (old cached UI)'
+    local lines = ('Server: v%s\nClient: v%s\nUI: %s\nFolder: %s'):format(srv.version or '?', clientVersion, uiVersion and ('v' .. ui) or ui, srv.path or '?')
+    print('[velora_jamco] ' .. lines:gsub('\n', ' | '))
+    local ok = uiVersion ~= nil and uiVersion == clientVersion and srv.version == clientVersion
+    lib.notify({ title = 'Velora Jam Co. version', description = lines, type = ok and 'success' or 'error', duration = 12000 })
+    SendNUIMessage({ action = 'version' })
+end, false)

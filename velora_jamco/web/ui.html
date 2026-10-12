@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Velora Jam Co.</title>
+    <!-- This page never changes between versions. It loads every stylesheet and script with a
+         fresh timestamp, so FiveM's browser cache can never serve an old copy of the UI. -->
+    <script>
+        window.VJ_LOAD_T = Date.now();
+        document.write('<link rel="stylesheet" href="css/style.css?t=' + window.VJ_LOAD_T + '">');
+    </script>
+</head>
+<body>
+    <div id="root" class="hidden">
+        <div class="backdrop"></div>
+        <section id="app-business" class="app panel hidden"></section>
+        <section id="app-kitchen" class="app panel hidden"></section>
+        <section id="app-harvest" class="app harvest hidden"></section>
+        <section id="app-sell" class="app sell hidden"></section>
+    </div>
+    <div id="reveal" class="hidden"></div>
+    <div id="toasts"></div>
+    <div id="vj-version"></div>
+
+    <script>
+        ['core', 'sfx', 'book', 'business', 'art', 'harvest', 'minigames', 'kitchen', 'sell'].forEach(function (name) {
+            document.write('<script src="js/' + name + '.js?t=' + window.VJ_LOAD_T + '"><\/script>');
+        });
+    </script>
+</body>
+</html>

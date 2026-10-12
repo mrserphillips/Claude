@@ -498,3 +498,8 @@ img { -webkit-user-drag: none; }
     .stage .dot { width: 36px; height: 36px; font-size: 16px; }
     .item-tile img { width: 48px; height: 48px; }
 }
+
+/* version stamp (shown by /jamversion) */
+#vj-version { position: fixed; left: 16px; bottom: 16px; z-index: 70; padding: 6px 12px; border-radius: 8px; font-family: 'Cinzel', serif; font-size: 13px;
+    color: var(--gold-2); background: rgba(10, 6, 10, .85); border: 1px solid var(--line-gold); opacity: 0; transition: opacity .3s; pointer-events: none; }
+#vj-version.show { opacity: 1; }

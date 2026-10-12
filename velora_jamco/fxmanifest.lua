@@ -6,7 +6,7 @@ use_experimental_fxv2_oal 'yes'
 name 'velora_jamco'
 author 'Velora RP'
 description 'Velora Jam Co. - fruit harvesting, jam making, recipe discovery and NPC selling'
-version '1.2.0'
+version '1.2.1'
 
 dependencies {
     '/onesync',
@@ -42,10 +42,10 @@ server_scripts {
     'server/selling.lua',
 }
 
-ui_page 'web/index.html'
+ui_page 'web/ui.html'
 
 files {
-    'web/index.html',
+    'web/ui.html',
     'web/css/*.css',
     'web/js/*.js',
     'web/fonts/*.woff2',

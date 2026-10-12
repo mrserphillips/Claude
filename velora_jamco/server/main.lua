@@ -53,6 +53,8 @@ do
     ExperimentalRecipe.value = ExperimentalRecipe.value or VJ.rarity('experimental').value
     VJS.Recipes[ExperimentalRecipe.id] = ExperimentalRecipe
     print(('^5[velora_jamco]^7 loaded %d recipes'):format(#VJS.RecipeList))
+    print(('^5[velora_jamco]^7 version %s running from %s'):format(
+        GetResourceMetadata(GetCurrentResourceName(), 'version', 0) or '?', GetResourcePath(GetCurrentResourceName())))
 end
 
 -- ─────────────────────────────────────────────────────────────────────────
@@ -579,4 +581,9 @@ lib.addCommand('jamtree', {
         return VJS.notify(source, 'Unknown fruit. Use: ' .. table.concat(Config.FruitOrder, ', '), 'error')
     end
     TriggerClientEvent('velora_jamco:client:copyCoords', source, 'tree', args.fruit)
+end)
+
+lib.callback.register('velora_jamco:version', function()
+    local res = GetCurrentResourceName()
+    return { version = GetResourceMetadata(res, 'version', 0), path = GetResourcePath(res), name = res }
 end)

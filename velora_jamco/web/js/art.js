@@ -7,7 +7,7 @@
 'use strict';
 
 const ART_BASE = 'images/minigames/';
-const ART_VERSION = '1.2.0'; // bump to force FiveM to reload changed artwork
+const ART_VERSION = window.VJ_LOAD_T || Date.now(); // fresh every session so changed artwork always shows
 
 const ART_FILES = {
     // shared

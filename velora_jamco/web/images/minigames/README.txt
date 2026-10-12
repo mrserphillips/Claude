@@ -1,6 +1,6 @@
 Velora Jam Co. minigame artwork goes here. Every file is OPTIONAL - anything missing falls back
 to the built-in drawings. See install/ART_GUIDE.md for sizes, layout and image prompts, and
-install/art-templates/ for exact sizing guides.
+tools/gen_art_templates.py to generate exact sizing guides.
 
 kitchen_bg.jpg   jam_texture.jpg
 prepare/bg.jpg   prepare/board.png   prepare/knife.png

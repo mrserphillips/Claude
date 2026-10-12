@@ -1,6 +1,7 @@
 /* Velora Jam Co. — NUI core: messaging, focus, helpers, overlays */
 'use strict';
 
+const UI_VERSION = '1.2.1';
 const RES = typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'velora_jamco';
 const VJ = { app: null, apps: {}, data: null };
 
@@ -98,6 +99,13 @@ window.addEventListener('message', (e) => {
     switch (msg.action) {
         case 'open': openApp(msg.app, msg.data); break;
         case 'close': if (VJ.app) closeApp(true); break;
+        case 'version': {
+            const v = $('#vj-version');
+            v.textContent = `Velora Jam Co. UI v${UI_VERSION}`;
+            v.classList.add('show');
+            setTimeout(() => v.classList.remove('show'), 6000);
+            break;
+        }
         case 'achievements': (msg.data || []).forEach((a) => toast(a.label, a.description)); break;
         default: {
             const mod = VJ.app && VJ.apps[VJ.app];
@@ -226,4 +234,8 @@ function loadImage(src) {
 }
 
 /* Signal readiness (Lua side ignores unknown callbacks safely) */
-window.addEventListener('load', () => { document.body.dataset.ready = '1'; });
+window.addEventListener('load', () => {
+    document.body.dataset.ready = '1';
+    // tell Lua which UI build actually loaded (shown by /jamversion)
+    post('uiVersion', { version: UI_VERSION });
+});
