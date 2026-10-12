@@ -10,6 +10,7 @@ Built for QBox (`qbx_core`), `ox_inventory`, `ox_target`, `ox_lib` and `oxmysql`
 | [`install/INSTALL.md`](install/INSTALL.md) | Step-by-step installation |
 | [`install/CONFIG_GUIDE.md`](install/CONFIG_GUIDE.md) | Coordinates, trees, kitchens, vans, recipes, economy |
 | [`install/TROUBLESHOOTING.md`](install/TROUBLESHOOTING.md) | Common problems and fixes |
+| [`install/ART_GUIDE.md`](install/ART_GUIDE.md) | Optional artwork for the minigames: sizes, templates, image prompts |
 | [`install/ox_inventory_items.lua`](install/ox_inventory_items.lua) | Item definitions to paste into ox_inventory |
 | [`sql/install.sql`](sql/install.sql) | Database tables (also auto-created on start) |
 

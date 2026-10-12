@@ -352,6 +352,8 @@ VJ.apps.kitchen = (() => {
         open(section, d) {
             root = section; data = d; tab = 'mix'; craft = null; busy = false; preview = null;
             mix = { fruits: [], special: null, jars: 1, pectin: false };
+            Art.preload();
+            Art.preloadFruit(d.fruits.map((f) => f.id));
             shell();
             root.addEventListener('click', onClick);
         },

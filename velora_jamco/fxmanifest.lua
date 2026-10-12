@@ -52,4 +52,8 @@ files {
     'web/images/items/*.png',
     'web/images/jams/*.png',
     'web/images/ui/*.png',
+    'web/images/minigames/*.png',
+    'web/images/minigames/*.jpg',
+    'web/images/minigames/*/*.png',
+    'web/images/minigames/*/*.jpg',
 }

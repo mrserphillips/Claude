@@ -155,7 +155,42 @@ VJ.apps.harvest = (() => {
     function drop(f) { f.state = 'fall'; f.t = 0; f.vy = -60; release(f); }
 
     /* ── Drawing ──────────────────────────────────────────────────────── */
+    // Draws a straight branch image bent along the branch curve, slice by slice
+    function drawBranchSprite(b, img) {
+        const N = 28;
+        const thick = ART_LAYOUT.harvest.branchThickness * (b.w / 22);
+        const pt = (t) => ({
+            x: (1 - t) * (1 - t) * b.x0 + 2 * (1 - t) * t * b.cx + t * t * b.x1,
+            y: (1 - t) * (1 - t) * b.y0 + 2 * (1 - t) * t * b.cy + t * t * b.y1,
+        });
+        const flip = b.x0 > b.x1; // branches growing from the right keep their base at the edge
+        for (let i = 0; i < N; i++) {
+            const t0 = i / N, t1 = (i + 1) / N;
+            const a = pt(t0), c = pt(t1);
+            const len = Math.hypot(c.x - a.x, c.y - a.y) + 1.5;
+            const ang = Math.atan2(c.y - a.y, c.x - a.x);
+            const si = flip ? N - 1 - i : i;
+            ctx.save();
+            ctx.translate(a.x, a.y); ctx.rotate(ang);
+            if (flip) ctx.scale(1, -1);
+            ctx.drawImage(img, si / N * img.width, 0, img.width / N, img.height, 0, -thick / 2, len, thick);
+            ctx.restore();
+        }
+    }
+
     function drawScene(t) {
+        const bg = Art.get('harvestBg');
+        const branchImg = Art.get('branch');
+        if (bg) {
+            Art.cover(ctx, bg, 0, 0, W, H);
+            for (const m of scene.motes) {
+                m.y -= m.v * 0.016; if (m.y < -5) m.y = H + 5;
+                ctx.fillStyle = `rgba(255,240,220,${0.18 + Math.sin(t * 2 + m.x) * 0.1})`;
+                ctx.beginPath(); ctx.arc(m.x, m.y, m.s, 0, 7); ctx.fill();
+            }
+        }
+        if (bg && branchImg) { for (const b of scene.branches) drawBranchSprite(b, branchImg); return; }
+        if (bg) return drawProceduralBranches(t, branchImg);
         const sky = ctx.createLinearGradient(0, 0, 0, H);
         sky.addColorStop(0, '#1a0a1e'); sky.addColorStop(0.55, '#4a1a3a'); sky.addColorStop(1, '#c2577a');
         ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
@@ -175,6 +210,11 @@ VJ.apps.harvest = (() => {
             ctx.fillStyle = `rgba(255,220,240,${0.25 + Math.sin(t * 2 + m.x) * 0.15})`;
             ctx.beginPath(); ctx.arc(m.x, m.y, m.s, 0, 7); ctx.fill();
         }
+        drawProceduralBranches(t, branchImg);
+    }
+
+    function drawProceduralBranches(t, branchImg) {
+        if (branchImg) { for (const b of scene.branches) drawBranchSprite(b, branchImg); return; }
         for (const b of scene.branches) {
             const g = ctx.createLinearGradient(0, b.y0 - 20, 0, b.y0 + 30);
             g.addColorStop(0, '#5a3a26'); g.addColorStop(1, '#2a160c');
@@ -216,7 +256,11 @@ VJ.apps.harvest = (() => {
         }
         ctx.save();
         ctx.translate(f.x, f.y); ctx.rotate(f.rot);
-        const img = f.kind === 'golden' ? sprites.golden : f.kind === 'rotten' ? sprites.rotten : (f.state === 'unripe' || f.state === 'grow') ? sprites.unripe : sprites.ripe;
+        const fid = spec.fruit.id;
+        const img = f.kind === 'golden' ? (Art.fruit('golden') || sprites.golden)
+            : f.kind === 'rotten' ? (Art.fruit(fid, 'rotten') || sprites.rotten)
+            : (f.state === 'unripe' || f.state === 'grow') ? (Art.fruit(fid, 'unripe') || sprites.unripe)
+            : (Art.fruit(fid) || sprites.ripe);
         ctx.drawImage(img, -size / 2, -size / 2, size, size);
         ctx.restore();
         if (f.kind === 'rotten' && f.state === 'rot') {
@@ -235,7 +279,8 @@ VJ.apps.harvest = (() => {
         drawScene(t);
         for (const f of st.fruits) drawFruit(f, t);
         // basket
-        ctx.drawImage(sprites.basket, W - 170, H - 150, 150, 150);
+        const bk = ART_LAYOUT.harvest.basket;
+        ctx.drawImage(Art.get('basket') || sprites.basket, bk.x, bk.y, bk.w, bk.h);
         ctx.font = '700 26px Cinzel'; ctx.textAlign = 'center';
         ctx.fillStyle = '#ffe3f0'; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 5;
         const label = `${st.picked}/${spec.ripe}`;
@@ -360,6 +405,8 @@ VJ.apps.harvest = (() => {
                 </div>`;
             cv = $('canvas', root);
             ctx = cv.getContext('2d');
+            Art.preload(['harvestBg', 'branch', 'basket']);
+            Art.preloadFruit([d.fruit.id, 'golden']);
             scene = buildScene();
             st = newGame();
             fit = fitCanvas(cv, W, H);

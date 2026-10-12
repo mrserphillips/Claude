@@ -51,6 +51,16 @@ function kitchenBackdrop(ctx) {
     ctx.fillStyle = lamp; ctx.fillRect(0, 0, MW, MH);
 }
 
+/* Painted background for a stage if provided, otherwise the drawn kitchen wall */
+function stageBackdrop(ctx, key) {
+    const img = Art.get(key) || Art.get('kitchenBg');
+    if (!img) return kitchenBackdrop(ctx);
+    Art.cover(ctx, img, 0, 0, MW, MH);
+    const v = ctx.createRadialGradient(MW / 2, MH / 2, MH * 0.35, MW / 2, MH / 2, MW * 0.7);
+    v.addColorStop(0, 'rgba(10,4,8,.15)'); v.addColorStop(1, 'rgba(10,4,8,.6)');
+    ctx.fillStyle = v; ctx.fillRect(0, 0, MW, MH);
+}
+
 const Minigames = {};
 
 /* ═══════════════ A: PREPARE — slice targets in sequence ═══════════════ */
@@ -67,11 +77,13 @@ Minigames.prepare = (host, p, info, done) => {
         const col = row === 0 ? i : i - cols;
         const x = 200 + (col + 0.5) * (600 / cols) + (row ? 30 : -30);
         const y = row === 0 ? 205 : 345;
-        targets.push({ x, y, img: imgs[i % imgs.length], state: 'wait', t: 0, cut: 0, angle: (Math.random() - .5) * 1.2 });
+        const f = info.fruits[i % info.fruits.length];
+        targets.push({ x, y, fid: f.id, img: imgs[i % imgs.length], state: 'wait', t: 0, cut: 0, angle: (Math.random() - .5) * 1.2 });
     }
     let idx = 0, hits = 0, perfects = 0, misses = 0, raf = 0, last = performance.now(), gap = 0.5, finished = false;
     const parts = [], texts = [];
     const juice = rgb(jamColour(info.fruits));
+    let mouse = null;
     const h = hud(host, `<span class="hint">Click the glowing target when the ring meets the circle — or press <span class="kbd">Space</span></span><b id="pScore" style="font-family:Cinzel">0 / ${N}</b>`);
 
     function resolve(kind, x, y) {
@@ -111,30 +123,46 @@ Minigames.prepare = (host, p, info, done) => {
         }
         targets.forEach((t) => { if (t.state === 'cut' || t.state === 'missed') t.t += dt; });
         c.clear();
-        kitchenBackdrop(ctx);
+        stageBackdrop(ctx, 'prepareBg');
         // board
-        ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 14;
-        const wood = ctx.createLinearGradient(0, 120, 0, 440);
-        wood.addColorStop(0, '#9a6638'); wood.addColorStop(1, '#5d3a1d');
-        ctx.fillStyle = wood; roundRect(ctx, 150, 120, 700, 320, 36); ctx.fill();
-        ctx.restore();
-        ctx.strokeStyle = 'rgba(40,20,8,.35)'; ctx.lineWidth = 2;
-        for (let i = 0; i < 14; i++) { ctx.beginPath(); ctx.moveTo(170, 140 + i * 22); ctx.bezierCurveTo(400, 130 + i * 22 + Math.sin(i) * 8, 600, 150 + i * 22, 830, 140 + i * 22); ctx.stroke(); }
-        ctx.fillStyle = '#2a160a'; ctx.beginPath(); ctx.arc(805, 160, 12, 0, 7); ctx.fill();
+        const boardImg = Art.get('board');
+        if (boardImg) {
+            const b = ART_LAYOUT.prepare.board;
+            ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 14;
+            ctx.drawImage(boardImg, b.x, b.y, b.w, b.h); ctx.restore();
+        } else {
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 14;
+            const wood = ctx.createLinearGradient(0, 120, 0, 440);
+            wood.addColorStop(0, '#9a6638'); wood.addColorStop(1, '#5d3a1d');
+            ctx.fillStyle = wood; roundRect(ctx, 150, 120, 700, 320, 36); ctx.fill();
+            ctx.restore();
+            ctx.strokeStyle = 'rgba(40,20,8,.35)'; ctx.lineWidth = 2;
+            for (let i = 0; i < 14; i++) { ctx.beginPath(); ctx.moveTo(170, 140 + i * 22); ctx.bezierCurveTo(400, 130 + i * 22 + Math.sin(i) * 8, 600, 150 + i * 22, 830, 140 + i * 22); ctx.stroke(); }
+            ctx.fillStyle = '#2a160a'; ctx.beginPath(); ctx.arc(805, 160, 12, 0, 7); ctx.fill();
+        }
         // fruit
         targets.forEach((t, i) => {
             const s = 92;
-            if (t.state === 'cut') {
+            const whole = Art.fruit(t.fid) || t.img;
+            const cutImg = Art.fruit(t.fid, 'cut');
+            if (t.state === 'cut' && cutImg) {
+                ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.angle * 0.3);
+                ctx.globalAlpha = Math.min(1, t.t / 0.15);
+                ctx.drawImage(cutImg, -s * 0.6, -s * 0.6, s * 1.2, s * 1.2);
+                ctx.globalAlpha = 1;
+                if (t.t < 0.3) { ctx.strokeStyle = `rgba(255,255,255,${1 - t.t / 0.3})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -70); ctx.lineTo(0, 70); ctx.stroke(); }
+                ctx.restore();
+            } else if (t.state === 'cut') {
                 const o = Math.min(26, t.t * 120);
                 ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.angle);
-                ctx.save(); ctx.beginPath(); ctx.rect(-s, -s, s, s * 2); ctx.clip(); ctx.drawImage(t.img, -s / 2 - o, -s / 2, s, s); ctx.restore();
-                ctx.save(); ctx.beginPath(); ctx.rect(0, -s, s, s * 2); ctx.clip(); ctx.drawImage(t.img, -s / 2 + o, -s / 2, s, s); ctx.restore();
+                ctx.save(); ctx.beginPath(); ctx.rect(-s, -s, s, s * 2); ctx.clip(); ctx.drawImage(whole, -s / 2 - o, -s / 2, s, s); ctx.restore();
+                ctx.save(); ctx.beginPath(); ctx.rect(0, -s, s, s * 2); ctx.clip(); ctx.drawImage(whole, -s / 2 + o, -s / 2, s, s); ctx.restore();
                 if (t.t < 0.3) { ctx.strokeStyle = `rgba(255,255,255,${1 - t.t / 0.3})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -70); ctx.lineTo(0, 70); ctx.stroke(); }
                 ctx.restore();
             } else {
                 ctx.globalAlpha = t.state === 'missed' ? 0.45 : 1;
-                ctx.drawImage(t.img, t.x - s / 2, t.y - s / 2, s, s);
+                ctx.drawImage(whole, t.x - s / 2, t.y - s / 2, s, s);
                 ctx.globalAlpha = 1;
             }
             if (i >= idx && i < idx + 3 && t.state !== 'cut') {
@@ -161,11 +189,19 @@ Minigames.prepare = (host, p, info, done) => {
         ctx.globalAlpha = 1;
         texts.forEach((x) => { x.t += dt; ctx.globalAlpha = Math.max(0, 1 - x.t); ctx.font = '700 26px Cinzel'; ctx.textAlign = 'center'; ctx.fillStyle = x.c; ctx.fillText(x.s, x.x, x.y - x.t * 40); });
         ctx.globalAlpha = 1;
+        const knife = Art.get('knife');
+        if (knife && mouse) {
+            const k = ART_LAYOUT.prepare.knife;
+            ctx.save(); ctx.translate(mouse.x, mouse.y); ctx.rotate(-0.6);
+            ctx.drawImage(knife, -k.w * k.tipX, -k.h * k.tipY, k.w, k.h); ctx.restore();
+        }
         raf = requestAnimationFrame(frame);
     }
     raf = requestAnimationFrame(frame);
     const onDown = (e) => { const q = c.fit.toLogical(e.clientX, e.clientY); attempt(q.x, q.y, false); };
+    const onMove = (e) => { mouse = c.fit.toLogical(e.clientX, e.clientY); c.cv.style.cursor = Art.get('knife') ? 'none' : ''; };
     c.cv.addEventListener('mousedown', onDown);
+    c.cv.addEventListener('mousemove', onMove);
     return {
         key(e, down) { if (down && (e.code === 'Space' || e.code === 'Enter') && !e.repeat) { e.preventDefault(); attempt(0, 0, true); } },
         destroy() { cancelAnimationFrame(raf); c.cv.removeEventListener('mousedown', onDown); c.dispose(); h.remove(); },
@@ -205,10 +241,13 @@ Minigames.heat = (host, p, info, done) => {
             if (hint) hint.innerHTML = !reached ? 'Bring the pot up to temperature...' : inBand ? '<b class="good">Perfect — hold it there!</b>' : temp > p.bandMax ? '<b class="bad">Too hot! Ease off the heat.</b>' : '<b class="gold">Too cold — add some heat.</b>';
         }
         c.clear();
-        kitchenBackdrop(ctx);
+        stageBackdrop(ctx, 'heatBg');
         const cx = 500, cy = 250;
+        const HL = ART_LAYOUT.heat;
         // stove top
-        ctx.fillStyle = '#1b1b1f'; roundRect(ctx, 300, 300, 400, 40, 10); ctx.fill();
+        const stoveImg = Art.get('stove');
+        if (stoveImg) ctx.drawImage(stoveImg, HL.stove.x, HL.stove.y, HL.stove.w, HL.stove.h);
+        else { ctx.fillStyle = '#1b1b1f'; roundRect(ctx, 300, 300, 400, 40, 10); ctx.fill(); }
         // flames
         const fl = burner;
         for (let i = 0; i < 16; i++) {
@@ -219,21 +258,30 @@ Minigames.heat = (host, p, info, done) => {
             g.addColorStop(0, 'rgba(80,140,255,.9)'); g.addColorStop(0.4, `rgba(255,${120 + fl * 60},40,.85)`); g.addColorStop(1, 'rgba(255,200,80,0)');
             ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y - hgt / 2, 8, hgt / 2, 0, 0, 7); ctx.fill();
         }
-        // pot body (copper)
-        const body = ctx.createLinearGradient(330, 0, 670, 0);
-        body.addColorStop(0, '#5a2a12'); body.addColorStop(0.25, '#d47a3c'); body.addColorStop(0.45, '#f5b07a'); body.addColorStop(0.7, '#a14a1e'); body.addColorStop(1, '#4a200c');
-        ctx.fillStyle = body;
-        ctx.beginPath(); ctx.moveTo(340, 150); ctx.lineTo(660, 150); ctx.quadraticCurveTo(662, 300, 610, 312); ctx.lineTo(390, 312); ctx.quadraticCurveTo(338, 300, 340, 150); ctx.fill();
-        ctx.fillStyle = '#3a1608'; ctx.fillRect(300, 180, 44, 14); ctx.fillRect(656, 180, 44, 14);
-        // rim + jam surface
-        ctx.fillStyle = '#e09a62'; ctx.beginPath(); ctx.ellipse(cx, 150, 162, 34, 0, 0, 7); ctx.fill();
+        // pot body (painted image, or drawn copper)
+        const potImg = Art.get('pot');
+        if (potImg) {
+            ctx.drawImage(potImg, HL.pot.x, HL.pot.y, HL.pot.w, HL.pot.h);
+        } else {
+            const body = ctx.createLinearGradient(330, 0, 670, 0);
+            body.addColorStop(0, '#5a2a12'); body.addColorStop(0.25, '#d47a3c'); body.addColorStop(0.45, '#f5b07a'); body.addColorStop(0.7, '#a14a1e'); body.addColorStop(1, '#4a200c');
+            ctx.fillStyle = body;
+            ctx.beginPath(); ctx.moveTo(340, 150); ctx.lineTo(660, 150); ctx.quadraticCurveTo(662, 300, 610, 312); ctx.lineTo(390, 312); ctx.quadraticCurveTo(338, 300, 340, 150); ctx.fill();
+            ctx.fillStyle = '#3a1608'; ctx.fillRect(300, 180, 44, 14); ctx.fillRect(656, 180, 44, 14);
+            ctx.fillStyle = '#e09a62'; ctx.beginPath(); ctx.ellipse(cx, 150, 162, 34, 0, 0, 7); ctx.fill();
+        }
+        // jam surface (textured if jam_texture.jpg exists)
         const burnt = Math.min(1, ms.hot / (p.burnSeconds * 1000));
         const surf = [0, 1, 2].map((i) => jam[i] * (1 - burnt * 0.6));
-        ctx.fillStyle = rgb(surf); ctx.beginPath(); ctx.ellipse(cx, 154, 148, 27, 0, 0, 7); ctx.fill();
+        const S = HL.surface;
+        ctx.beginPath(); ctx.ellipse(S.x, S.y, S.rx, S.ry, 0, 0, 7);
+        JamPaint.fill(ctx, surf.map(Math.round), { x: S.x - S.rx, y: S.y - S.ry, w: S.rx * 2, h: S.ry * 2 }, now / 9000, 0);
+        const potFront = Art.get('potFront');
+        if (potFront) ctx.drawImage(potFront, HL.pot.x, HL.pot.y, HL.pot.w, HL.pot.h);
         // bubbles & steam scale with temperature
         const heat = clamp((temp - 60) / 60, 0, 1.4);
-        if (Math.random() < heat * 0.6) { bubbles.push({ x: cx + (Math.random() - .5) * 250, y: 154 + (Math.random() - .5) * 36, r: 0, max: 4 + Math.random() * 9 }); if (Math.random() < 0.3) SFX.bubble(); }
-        if (Math.random() < heat * 0.35) steam.push({ x: cx + (Math.random() - .5) * 220, y: 140, r: 14 + Math.random() * 16, life: 1, vx: (Math.random() - .5) * 18 });
+        if (Math.random() < heat * 0.6) { bubbles.push({ x: S.x + (Math.random() - .5) * S.rx * 1.7, y: S.y + (Math.random() - .5) * S.ry * 1.3, r: 0, max: 4 + Math.random() * 9 }); if (Math.random() < 0.3) SFX.bubble(); }
+        if (Math.random() < heat * 0.35) steam.push({ x: S.x + (Math.random() - .5) * S.rx * 1.5, y: S.y - 14, r: 14 + Math.random() * 16, life: 1, vx: (Math.random() - .5) * 18 });
         for (let i = bubbles.length - 1; i >= 0; i--) {
             const b = bubbles[i]; b.r += dt * 18;
             ctx.strokeStyle = rgb(surf.map((v) => Math.min(255, v + 70)), 0.8); ctx.lineWidth = 1.5;
@@ -351,21 +399,36 @@ Minigames.stir = (host, p, info, done) => {
             }
         }
         c.clear();
-        kitchenBackdrop(ctx);
-        // pot from above
-        const rim = ctx.createRadialGradient(cx - 60, cy - 60, 40, cx, cy, R + 30);
-        rim.addColorStop(0, '#f5b07a'); rim.addColorStop(0.7, '#b55a26'); rim.addColorStop(1, '#4a200c');
-        ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(cx, cy, R + 26, 0, 7); ctx.fill();
+        stageBackdrop(ctx, 'stirBg');
+        const SL = ART_LAYOUT.stir;
+        // pot from above (painted image, or drawn copper rim)
+        const potTop = Art.get('potTop');
+        if (potTop) ctx.drawImage(potTop, SL.potTop.x, SL.potTop.y, SL.potTop.w, SL.potTop.h);
+        else {
+            const rim = ctx.createRadialGradient(cx - 60, cy - 60, 40, cx, cy, R + 30);
+            rim.addColorStop(0, '#f5b07a'); rim.addColorStop(0.7, '#b55a26'); rim.addColorStop(1, '#4a200c');
+            ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(cx, cy, R + 26, 0, 7); ctx.fill();
+        }
         const thick = progress;
         const base = jam.map((v) => v * (1 - thick * 0.25));
-        const g = ctx.createRadialGradient(cx - 40, cy - 50, 10, cx, cy, R);
-        g.addColorStop(0, rgb(base.map((v) => Math.min(255, v + 60 + thick * 40)))); g.addColorStop(1, rgb(base.map((v) => v * 0.6)));
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
+        const textured = !!Art.get('jamTexture');
+        if (textured) {
+            // the texture itself rotates with the spoon, so stirring visibly drags the jam round
+            ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7);
+            JamPaint.fill(ctx, base.map(Math.round), { x: cx - R, y: cy - R, w: R * 2, h: R * 2 }, accum * 0.6, thick * 0.12);
+            const gloss = ctx.createRadialGradient(cx - 70, cy - 80, 5, cx - 40, cy - 50, R * 0.9);
+            gloss.addColorStop(0, `rgba(255,255,255,${0.12 + thick * 0.18})`); gloss.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = gloss; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
+        } else {
+            const g = ctx.createRadialGradient(cx - 40, cy - 50, 10, cx, cy, R);
+            g.addColorStop(0, rgb(base.map((v) => Math.min(255, v + 60 + thick * 40)))); g.addColorStop(1, rgb(base.map((v) => v * 0.6)));
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
+        }
         // swirl
         ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.clip();
         ctx.translate(cx, cy); ctx.rotate(accum * 0.6);
         for (let k = 0; k < 3; k++) {
-            ctx.strokeStyle = `rgba(255,255,255,${0.08 + thick * 0.14})`; ctx.lineWidth = 6 - k;
+            ctx.strokeStyle = `rgba(255,255,255,${(textured ? 0.04 : 0.08) + thick * (textured ? 0.06 : 0.14)})`; ctx.lineWidth = 6 - k;
             ctx.beginPath();
             for (let t = 0; t < 14; t += 0.1) { const r = 10 + t * 13; const a = t + k * 2.1; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
             ctx.stroke();
@@ -386,9 +449,16 @@ Minigames.stir = (host, p, info, done) => {
         const sp = mouse && Math.hypot(mouse.x - cx, mouse.y - cy) < R + 10 ? mouse : { x: cx + Math.cos(accum) * 130, y: cy + Math.sin(accum) * 130 };
         const ang = Math.atan2(sp.y - cy, sp.x - cx);
         ctx.save(); ctx.translate(sp.x, sp.y); ctx.rotate(ang);
-        ctx.fillStyle = '#c99257'; ctx.fillRect(10, -7, 260, 14);
-        ctx.fillStyle = '#b07a40'; ctx.beginPath(); ctx.ellipse(0, 0, 34, 24, 0, 0, 7); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(-6, -6, 18, 9, 0, 0, 7); ctx.fill();
+        const spoonImg = Art.get('spoon');
+        if (spoonImg) {
+            const k = SL.spoon;
+            ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
+            ctx.drawImage(spoonImg, -k.w * k.headX, -k.h * k.headY, k.w, k.h);
+        } else {
+            ctx.fillStyle = '#c99257'; ctx.fillRect(10, -7, 260, 14);
+            ctx.fillStyle = '#b07a40'; ctx.beginPath(); ctx.ellipse(0, 0, 34, 24, 0, 0, 7); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.beginPath(); ctx.ellipse(-6, -6, 18, 9, 0, 0, 7); ctx.fill();
+        }
         ctx.restore();
         splash.forEach((s) => { s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 600 * dt; s.life -= dt * 2; ctx.globalAlpha = Math.max(0, s.life); ctx.fillStyle = rgb(jam); ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, 7); ctx.fill(); });
         ctx.globalAlpha = 1;
@@ -432,7 +502,8 @@ Minigames.fill = (host, p, info, done) => {
     const h = hud(host, `<span class="hint">Hold <span class="kbd">Space</span> or the button to pour. Release in the <b class="pink">perfect</b> zone — the ladle drips a little after you stop!</span>
         <button class="btn hold-btn" id="pour">Hold to Pour</button>`);
     const btn = $('#pour', h);
-    const JX = 470, JY = 140, JW = 220, JH = 290;
+    const FL = ART_LAYOUT.fill;
+    const JX = FL.inside.x, JY = FL.inside.y, JW = FL.inside.w, JH = FL.inside.h;
 
     function frame(now) {
         const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -449,8 +520,8 @@ Minigames.fill = (host, p, info, done) => {
             }
         }
         c.clear();
-        kitchenBackdrop(ctx);
-        ctx.fillStyle = '#2a1a12'; ctx.fillRect(0, 440, MW, 80);
+        stageBackdrop(ctx, 'fillBg');
+        if (!Art.get('fillBg') && !Art.get('kitchenBg')) { ctx.fillStyle = '#2a1a12'; ctx.fillRect(0, 440, MW, 80); }
         // gauge
         const gy0 = JY, gy1 = JY + JH;
         const gy = (v) => gy1 - clamp(v, 0, 110) / 110 * (gy1 - gy0);
@@ -464,25 +535,46 @@ Minigames.fill = (host, p, info, done) => {
         ctx.fillStyle = '#ff9cc8'; ctx.fillText('Perfect!', 300, gy((p.perfectMin + p.perfectMax) / 2) + 5);
         ctx.fillStyle = '#b9a2ad'; ctx.fillText('Too Low', 300, gy(p.idealMin / 2) + 5);
         ctx.fillStyle = '#fff'; ctx.fillRect(312, gy(fill) - 2, 42, 4);
-        // jar
-        ctx.save();
-        roundRect(ctx, JX, JY, JW, JH, 26); ctx.clip();
+        // jar: optional back wall, then jam, then the glass on top
+        const jarImg = Art.get('jar'), jarBack = Art.get('jarBack');
+        if (jarBack) ctx.drawImage(jarBack, FL.jar.x, FL.jar.y, FL.jar.w, FL.jar.h);
         const lv = JY + JH - clamp(fill, 0, 100) / 100 * JH;
-        const jg = ctx.createLinearGradient(0, lv, 0, JY + JH);
-        jg.addColorStop(0, rgb(jam.map((v) => Math.min(255, v + 40)))); jg.addColorStop(1, rgb(jam.map((v) => v * 0.55)));
-        ctx.fillStyle = jg; ctx.fillRect(JX, lv + Math.sin(now / 120) * 1.5, JW, JY + JH - lv);
+        ctx.save();
+        roundRect(ctx, JX, JY, JW, JH, FL.inside.r); ctx.clip();
+        const wobble = Math.sin(now / 120) * 1.5;
+        if (Art.get('jamTexture')) {
+            ctx.beginPath(); ctx.rect(JX, lv + wobble, JW, JY + JH - lv);
+            JamPaint.fill(ctx, jam, { x: JX, y: JY, w: JW, h: JH }, 0, 0);
+            const shade = ctx.createLinearGradient(JX, 0, JX + JW, 0);
+            shade.addColorStop(0, 'rgba(0,0,0,.35)'); shade.addColorStop(0.35, 'rgba(0,0,0,0)'); shade.addColorStop(1, 'rgba(0,0,0,.45)');
+            ctx.fillStyle = shade; ctx.fillRect(JX, lv + wobble, JW, JY + JH - lv);
+        } else {
+            const jg = ctx.createLinearGradient(0, lv, 0, JY + JH);
+            jg.addColorStop(0, rgb(jam.map((v) => Math.min(255, v + 40)))); jg.addColorStop(1, rgb(jam.map((v) => v * 0.55)));
+            ctx.fillStyle = jg; ctx.fillRect(JX, lv + wobble, JW, JY + JH - lv);
+        }
         ctx.restore();
-        ctx.fillStyle = 'rgba(230,220,235,.08)'; roundRect(ctx, JX, JY, JW, JH, 26); ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 3; roundRect(ctx, JX, JY, JW, JH, 26); ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,.22)'; roundRect(ctx, JX + 18, JY + 30, 16, JH - 70, 8); ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
-        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(JX + 6, JY - 6 - i * 8); ctx.lineTo(JX + JW - 6, JY - 4 - i * 8); ctx.stroke(); }
+        if (jarImg) {
+            ctx.drawImage(jarImg, FL.jar.x, FL.jar.y, FL.jar.w, FL.jar.h);
+        } else {
+            ctx.fillStyle = 'rgba(230,220,235,.08)'; roundRect(ctx, JX, JY, JW, JH, 26); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 3; roundRect(ctx, JX, JY, JW, JH, 26); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,255,255,.22)'; roundRect(ctx, JX + 18, JY + 30, 16, JH - 70, 8); ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
+            for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(JX + 6, JY - 6 - i * 8); ctx.lineTo(JX + JW - 6, JY - 4 - i * 8); ctx.stroke(); }
+        }
         // ladle & stream
         const tilt = 0.25 + flow * 0.55;
         ctx.save(); ctx.translate(640, 70); ctx.rotate(-tilt);
-        ctx.fillStyle = '#9aa3ad'; ctx.fillRect(0, -6, 230, 12);
-        ctx.fillStyle = '#c5ccd3'; ctx.beginPath(); ctx.arc(-20, 10, 46, 0, Math.PI); ctx.fill();
-        ctx.fillStyle = rgb(jam); ctx.beginPath(); ctx.ellipse(-20, 10, 40, 10, 0, 0, 7); ctx.fill();
+        const ladleImg = Art.get('ladle');
+        if (ladleImg) {
+            const L = FL.ladle;
+            ctx.drawImage(ladleImg, -20 - L.pivotX, 10 - L.pivotY, L.w, L.h);
+        } else {
+            ctx.fillStyle = '#9aa3ad'; ctx.fillRect(0, -6, 230, 12);
+            ctx.fillStyle = '#c5ccd3'; ctx.beginPath(); ctx.arc(-20, 10, 46, 0, Math.PI); ctx.fill();
+            ctx.fillStyle = rgb(jam); ctx.beginPath(); ctx.ellipse(-20, 10, 40, 10, 0, 0, 7); ctx.fill();
+        }
         ctx.restore();
         if (flow > 0.02) {
             ctx.strokeStyle = rgb(jam, 0.95); ctx.lineWidth = 4 + flow * 12; ctx.lineCap = 'round';
@@ -541,9 +633,11 @@ Minigames.seal = (host, p, info, done) => {
         cooldown = Math.max(0, cooldown - dt);
         lidRot += (lidTarget - lidRot) * Math.min(1, dt * 10);
         c.clear();
-        kitchenBackdrop(ctx);
-        // jar glimpse
-        ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.beginPath(); ctx.arc(cx, cy, R + 40, 0, 7); ctx.fill();
+        stageBackdrop(ctx, 'sealBg');
+        // jar seen from above
+        const jarTop = Art.get('jarTop');
+        if (jarTop) { const J = ART_LAYOUT.seal.jarTop; ctx.drawImage(jarTop, J.x, J.y, J.w, J.h); }
+        else { ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.beginPath(); ctx.arc(cx, cy, R + 40, 0, 7); ctx.fill(); }
         // zone arc
         if (!finished) {
             const z0 = (zone - p.zone / 2 - 90) * Math.PI / 180, z1 = (zone + p.zone / 2 - 90) * Math.PI / 180;
@@ -554,6 +648,12 @@ Minigames.seal = (host, p, info, done) => {
         }
         // lid
         ctx.save(); ctx.translate(cx, cy); ctx.rotate(lidRot * Math.PI / 180);
+        const lidImg = Art.get('lid');
+        if (lidImg) {
+            const L = ART_LAYOUT.seal.lid.size;
+            ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 10;
+            ctx.drawImage(lidImg, -L / 2, -L / 2, L, L);
+        } else {
         const gold = ctx.createRadialGradient(-R * 0.35, -R * 0.4, R * 0.1, 0, 0, R);
         gold.addColorStop(0, '#fbe6b4'); gold.addColorStop(0.55, '#d6a95a'); gold.addColorStop(1, '#7a5520');
         ctx.fillStyle = gold; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill();
@@ -564,6 +664,7 @@ Minigames.seal = (host, p, info, done) => {
         ctx.fillStyle = 'rgba(120,20,70,.35)'; ctx.fillText('V', 3, 6);
         ctx.fillStyle = '#c2185b'; ctx.fillText('V', 0, 0);
         ctx.textBaseline = 'alphabetic';
+        }
         ctx.restore();
         ctx.strokeStyle = 'rgba(255,255,255,.2)'; ctx.lineWidth = 2;
         for (let i = 0; i < 36; i++) { const a = i / 36 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * (R + 10), cy + Math.sin(a) * (R + 10)); ctx.lineTo(cx + Math.cos(a) * (R + 38), cy + Math.sin(a) * (R + 38)); ctx.stroke(); }
