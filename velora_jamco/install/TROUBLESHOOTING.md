@@ -17,6 +17,11 @@
   - On a restart, deposits are refunded to online players when the resource stops.
   - If a player crashed, their refund is queued and paid automatically the next time they log in.
 
+## Nothing opens after an update
+- **Kept your old `config.lua`?** That's supported. Missing settings are filled in automatically, and the console prints `your config.lua is from an older version` with the list.
+- **Check for errors:** look in the server console and in F8 in game for red lines mentioning `velora_jam`. Those show exactly what failed.
+- **Check versions:** type `/jamversion` to confirm the server, client and UI versions match.
+
 ## "could not find file" warnings
 The console warns `could not find file ...` when a line in `fxmanifest.lua` matches no files. Wildcards in folder names (`*/*.png`) are not supported by FiveM, so every art folder is listed separately.
 

@@ -7,7 +7,7 @@
 - **A vehicle key script.** `qbx_vehiclekeys` works by default. See `Config.VehicleKeys` for the other supported scripts.
 
 ## Steps
-1. **Copy the resource.** Put the folder into your resources, for example `resources/[velora]/velora_jamco`. Any folder name works, but use the same name in `ensure`. When updating, delete the old folder first instead of copying over it.
+1. **Copy the resource.** Put the folder into your resources, for example `resources/[velora]/velora_jamco`. Any folder name works, but use the same name in `ensure`. When updating, delete the old folder first instead of copying over it. You can keep your own `config.lua`: any settings added in newer versions are filled in with defaults automatically, and the server console lists them.
 
 2. **Database.** The tables are created automatically the first time the resource starts. If you prefer to create them yourself, run `sql/install.sql`.
 

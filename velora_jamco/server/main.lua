@@ -53,6 +53,10 @@ do
     ExperimentalRecipe.value = ExperimentalRecipe.value or VJ.rarity('experimental').value
     VJS.Recipes[ExperimentalRecipe.id] = ExperimentalRecipe
     print(('^5[velora_jamco]^7 loaded %d recipes'):format(#VJS.RecipeList))
+    if #VJ.MissingConfig > 0 then
+        print(('^3[velora_jamco] your config.lua is from an older version - %d missing setting(s) are using defaults: %s^7')
+            :format(#VJ.MissingConfig, table.concat(VJ.MissingConfig, ', ')))
+    end
     local manifestVersion = GetResourceMetadata(GetCurrentResourceName(), 'version', 0) or '?'
     print(('^5[velora_jamco]^7 version %s running from %s'):format(VJ.VERSION, GetResourcePath(GetCurrentResourceName())))
     if manifestVersion ~= VJ.VERSION then

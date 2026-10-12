@@ -6,7 +6,7 @@ use_experimental_fxv2_oal 'yes'
 name 'velora_jamco'
 author 'Velora RP'
 description 'Velora Jam Co. - fruit harvesting, jam making, recipe discovery and NPC selling'
-version '1.2.5'
+version '1.2.6'
 
 dependencies {
     '/onesync',
@@ -19,6 +19,7 @@ dependencies {
 
 shared_scripts {
     '@ox_lib/init.lua',
+    'shared/defaults.lua',
     'config.lua',
     'shared/utils.lua',
 }
