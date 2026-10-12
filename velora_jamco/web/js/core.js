@@ -1,7 +1,7 @@
 /* Velora Jam Co. — NUI core: messaging, focus, helpers, overlays */
 'use strict';
 
-const UI_VERSION = '1.2.4';
+const UI_VERSION = '1.2.5';
 const RES = typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'velora_jamco';
 const VJ = { app: null, apps: {}, data: null };
 

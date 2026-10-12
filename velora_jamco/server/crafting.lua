@@ -47,11 +47,23 @@ local function parseIngredients(data)
     return { fruits = fruits, special = special, jars = jars, pectin = data.pectin == true }
 end
 
+-- Total fruit for a batch (jars / JarsPerFruit, rounded up), split as evenly as possible.
+-- The web UI mirrors this exactly (fruitSplit in kitchen.js).
+function VJS.fruitSplit(kinds, jars)
+    local ratio = Config.Crafting.JarsPerFruit[kinds] or 1.0
+    local total = math.ceil(jars / ratio - 1e-9)
+    local base = math.floor(total / kinds)
+    local rem = total - base * kinds
+    local split = {}
+    for i = 1, kinds do split[i] = base + (i <= rem and 1 or 0) end
+    return split
+end
+
 local function requirements(parsed)
     local list = {}
-    local perJar = Config.Crafting.FruitPerJar[#parsed.fruits] or 2
-    for _, id in ipairs(parsed.fruits) do
-        list[#list + 1] = { item = Config.Fruits[id].item, count = perJar * parsed.jars, label = Config.Fruits[id].label, kind = 'fruit' }
+    local split = VJS.fruitSplit(#parsed.fruits, parsed.jars)
+    for i, id in ipairs(parsed.fruits) do
+        list[#list + 1] = { item = Config.Fruits[id].item, count = split[i], label = Config.Fruits[id].label, kind = 'fruit' }
     end
     if parsed.special then
         local s = Config.Specials[parsed.special]
@@ -115,10 +127,10 @@ lib.callback.register('velora_jamco:kitchen:getData', function(src)
             maxJars = Config.Crafting.MaxJarsPerBatch,
             minJars = Config.Crafting.MinJarsPerBatch or 1,
             -- string keys so the table serialises as a JSON object, not an array
-            fruitPerJar = {
-                ['1'] = Config.Crafting.FruitPerJar[1],
-                ['2'] = Config.Crafting.FruitPerJar[2],
-                ['3'] = Config.Crafting.FruitPerJar[3],
+            jarsPerFruit = {
+                ['1'] = Config.Crafting.JarsPerFruit[1],
+                ['2'] = Config.Crafting.JarsPerFruit[2],
+                ['3'] = Config.Crafting.JarsPerFruit[3],
             },
             sugarPerJar = Config.Crafting.SugarPerJar,
             specialPerBatch = Config.Crafting.SpecialPerBatch,
@@ -400,13 +412,13 @@ lib.callback.register('velora_jamco:craft:start', function(src, data)
     local bandMin = mg.heat.bandMin + math.random(-2, 2)
 
     local params = {
-        prepare = { targets = mg.prepare.targets + math.floor((parsed.jars - 1) / 3), window = mg.prepare.window / d },
+        prepare = { targets = mg.prepare.targets + math.floor((parsed.jars - 1) / 6), window = mg.prepare.window / d },
         heat = {
             startTemp = mg.heat.startTemp, bandMin = bandMin, bandMax = bandMin + mg.heat.bandWidth / d,
             cookSeconds = mg.heat.cookSeconds * math.sqrt(d), burnSeconds = mg.heat.burnSeconds,
         },
         stir = {
-            revolutions = mg.stir.revolutions + math.floor((parsed.jars - 1) / 3),
+            revolutions = mg.stir.revolutions + math.floor((parsed.jars - 1) / 6),
             burnRate = mg.stir.burnRate * d * (parsed.pectin and 0.8 or 1.0),
         },
         fill = {

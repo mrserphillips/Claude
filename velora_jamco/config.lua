@@ -305,9 +305,11 @@ Config.Kitchens = {
 Config.Crafting = {
     -- every batch makes several jars; the kitchen picks the most you can afford automatically
     MinJarsPerBatch = 3,
-    MaxJarsPerBatch = 12,
+    MaxJarsPerBatch = 24,
     -- fruit pieces needed PER JAR for EACH fruit in the mix, by number of different fruits
-    FruitPerJar = { [1] = 2, [2] = 1, [3] = 1 },
+    -- how many jars each piece of fruit makes, by number of different fruits in the mix
+    -- (15 strawberries x 1.2 = 18 jars, 16 mixed fruit x 1.25 = 20 jars). Mixed fruit is split evenly.
+    JarsPerFruit = { [1] = 1.2, [2] = 1.25, [3] = 1.25 },
     SugarPerJar = 1,
     -- special ingredient (cinnamon, honey, golden fruit...) is used once per batch
     SpecialPerBatch = 1,

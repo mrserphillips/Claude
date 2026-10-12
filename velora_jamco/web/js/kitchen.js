@@ -47,12 +47,21 @@ VJ.apps.kitchen = (() => {
     /* ── Mixing ───────────────────────────────────────────────────────── */
     const minJars = () => data.rules.minJars || 1;
     // the biggest batch your fruit allows (never below the minimum batch size)
+    // same maths as the server (VJS.fruitSplit): total fruit = jars / jarsPerFruit, split evenly
+    function fruitSplit(kinds, jars) {
+        const ratio = data.rules.jarsPerFruit[String(kinds)] || 1;
+        const total = Math.ceil(jars / ratio - 1e-9);
+        const base = Math.floor(total / kinds), rem = total - base * kinds;
+        return Array.from({ length: kinds }, (_, i) => base + (i < rem ? 1 : 0));
+    }
     function maxJars() {
         if (!mix.fruits.length) return data.rules.maxJars;
-        const per = data.rules.fruitPerJar[String(mix.fruits.length)] || 2;
-        let m = data.rules.maxJars;
-        mix.fruits.forEach((id) => { m = Math.min(m, Math.floor((counts()[fruitById(id).item] || 0) / per)); });
-        return Math.max(1, m);
+        const have = mix.fruits.map((id) => counts()[fruitById(id).item] || 0);
+        for (let j = data.rules.maxJars; j >= 1; j--) {
+            const need = fruitSplit(mix.fruits.length, j);
+            if (need.every((n, i) => n <= have[i])) return j;
+        }
+        return 1;
     }
 
     function drawMix(v) {
@@ -106,7 +115,7 @@ VJ.apps.kitchen = (() => {
                 </div>
                 <div class="card" style="margin-top:14px">
                     <div class="h3">Kitchen Notes</div>
-                    <div class="small muted">Single fruit: ${data.rules.fruitPerJar['1']} per jar · Two fruits: ${data.rules.fruitPerJar['2']} each · Three fruits: ${data.rules.fruitPerJar['3']} each.<br>Every jar needs sugar, an empty jar and a lid. Special ingredients are used once per batch.<br>Each batch makes ${data.rules.minJars || 1}–${data.rules.maxJars} jars; the biggest batch your fruit allows is picked for you.</div>
+                    <div class="small muted">Each fruit makes ${data.rules.jarsPerFruit['1']} jars on its own, or ${data.rules.jarsPerFruit['2']} jars in a mix (fruit is split evenly), e.g. 15 strawberries → ${Math.floor(15 * data.rules.jarsPerFruit['1'] + 1e-9)} jars.<br>Every jar needs sugar, an empty jar and a lid. Special ingredients are used once per batch.<br>Each batch makes ${data.rules.minJars || 1}–${data.rules.maxJars} jars; the biggest batch your fruit allows is picked for you.</div>
                 </div>
             </div>
         </div>`;
