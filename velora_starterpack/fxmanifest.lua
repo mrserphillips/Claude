@@ -6,7 +6,7 @@ use_experimental_fxv2_oal 'yes'
 name 'velora_starterpack'
 author 'Velora City'
 description 'Velora City starter pack — choose your path (Qbox / ox_inventory / oxmysql)'
-version '1.3.0'
+version '1.4.0'
 
 shared_script '@ox_lib/init.lua'
 
@@ -31,5 +31,4 @@ dependencies {
     'ox_lib',
     'ox_inventory',
     'qbx_core',
-    'qbx_vehicles',
 }

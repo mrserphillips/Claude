@@ -34,8 +34,8 @@ Config.Ped = {
     model = 'a_f_y_bevhills_02',
     -- Standing position (x, y, z = player standing height as /coords shows it,
     -- w = heading). Default: beside
-    -- the Legion Square car park entrance (qbx_garages "Pillbox Garage Parking"
-    -- access point is at 218.66, -804.08). Adjust with /coords if needed.
+    -- the Legion Square car park entrance, about 5 m from jg-advancedgarages'
+    -- 'Legion Square' garage (215.09, -805.17). Adjust with /coords if needed.
     coords = vec4(215.76, -810.12, 30.73, 335.0),
     scenario = 'WORLD_HUMAN_CLIPBOARD', -- set to false for a plain idle stance
 
@@ -148,12 +148,13 @@ Config.Rewards = {
             cash = 25000,
             bank = 15000,
         },
-        -- Owned vehicles, created through qbx_vehicles and stored in a garage.
+        -- Owned vehicles, stored in a garage (see Config.Vehicles.garageSystem).
         -- model  = spawn name (must be in qbx_core/shared/vehicles.lua)
-        -- garage = qbx_garages garage name ('pillboxgarage' = Legion Square car park)
-        -- props  = optional ox_lib vehicle properties, e.g. { color1 = { 255, 79, 163 } }
+        -- garage = garage name in your garage script. For jg-advancedgarages this is
+        --          the key in Config.GarageLocations ('Legion Square' by default).
+        -- props  = optional vehicle properties, e.g. { color1 = { 255, 79, 163 } }
         vehicles = {
-            { model = 'issi8', label = 'Weeny Issi Rally', garage = 'pillboxgarage' },
+            { model = 'issi8', label = 'Weeny Issi Rally', garage = 'Legion Square' },
         },
     },
 
@@ -212,10 +213,23 @@ Config.MoneyReason = 'velora-starter-pack'
 -- VEHICLES
 ---------------------------------------------------------------------------
 Config.Vehicles = {
+    -- Which garage script owns your vehicles:
+    --   'jg-advancedgarages' : writes the car straight into player_vehicles with
+    --                          JG's in_garage / garage_id columns (JG has no
+    --                          give-vehicle export)
+    --   'qbx_garages'        : uses exports.qbx_vehicles:CreatePlayerVehicle
+    garageSystem = 'jg-advancedgarages',
+
     -- Used when a vehicle entry has no garage of its own.
-    defaultGarage = 'pillboxgarage',
+    defaultGarage = 'Legion Square',
+
+    -- Plates for new starter vehicles: prefix + random letters/numbers, 8
+    -- characters in total. Uniqueness is checked against player_vehicles.
+    platePrefix = 'VC',
+
     -- Friendly garage names shown in the UI / notifications.
     garageLabels = {
+        ['Legion Square'] = 'Legion Square car park',
         pillboxgarage = 'Legion Square car park',
     },
     -- Image shown in the UI. %s = model. Falls back to a car icon if missing.

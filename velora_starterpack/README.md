@@ -22,8 +22,7 @@ Every path also gets the standard starter rewards: the items, cash, bank and the
 | `ox_inventory` | All items are granted through its server exports |
 | `ox_lib` | Callbacks and notifications |
 | `oxmysql` | Persistent claim tracking |
-| `qbx_vehicles` | Creates the owned starter vehicle (`CreatePlayerVehicle`) |
-| `qbx_garages` | Stores it in the Legion Square car park garage (`pillboxgarage`) |
+| `jg-advancedgarages` | Holds the starter vehicle in its **Legion Square** garage. Start it **before** this resource. |
 | `ox_target` *(optional)* | Third-eye interaction with the ped. Without it, players get an `[E]` prompt instead. |
 
 No ESX or qb-inventory functions are used.
@@ -40,7 +39,12 @@ No ESX or qb-inventory functions are used.
    `phone`, `cos_sprunk`, `bbs_double_cheese_goat`, `lockpick`, `pumpkin_patch_card`, `bodywavewigs`, `pink_messenger_bag`, `silver_chain`, `breeze_bangs`, `ls_og_kush_bag`, `ls_og_kush_seed`.
    On start, the resource prints a clear `ERROR` line for each missing item. **Claims are blocked until the problem is fixed**, so nobody receives a broken pack. Item icons come from `ox_inventory/web/images/<item>.png`; if an icon is missing, the UI shows a styled letter instead.
 
-4. **Starter vehicle (Weeny Issi Rally, `issi8`).** Every character gets one, stored in the **Legion Square car park** garage (`pillboxgarage` in qbx_garages), right next to the welcome host. `issi8` is already in `qbx_core/shared/vehicles.lua`. It's a newer GTA vehicle from The Chop Shop update, so your server needs a recent game build, for example `sv_enforceGameBuild 3095` or higher in server.cfg. On an older build the vehicle won't spawn from the garage.
+4. **Starter vehicle (Weeny Issi Rally, `issi8`).** Every character gets one, stored in jg-advancedgarages' **`Legion Square`** garage, the same car park as the welcome host.
+   - JG has no "give vehicle" export. It reads owned cars from `player_vehicles` using its own `in_garage` and `garage_id` columns. So this resource inserts the car row itself: owner, model, hash, a unique plate (prefix `VC`), `in_garage = 1` and `garage_id = 'Legion Square'`. Qbox's own `garage` and `state` columns are filled in too.
+   - Those columns come from JG's install SQL (`jg-advancedgarages/install/run-qb.sql`). If they're missing, the console says so on start and claims are blocked, so nobody gets a half-delivered pack.
+   - If you renamed the garage in JG's `Config.GarageLocations`, change `garage = 'Legion Square'` in `config.lua` to match exactly (it's case-sensitive).
+   - Using qbx_garages instead? Set `Config.Vehicles.garageSystem = 'qbx_garages'` and use a qbx garage name such as `pillboxgarage`.
+ `issi8` is already in `qbx_core/shared/vehicles.lua`. It's a newer GTA vehicle from The Chop Shop update, so your server needs a recent game build, for example `sv_enforceGameBuild 3095` or higher in server.cfg. On an older build the vehicle won't spawn from the garage.
 
 5. **Avoid a double phone.** qbx_core gives its own starter items (`qbx_core/config/shared.lua → starterItems`). If that list includes `phone`, remove it there, or remove it from this resource's `Config.Rewards.standard.items`.
 
@@ -51,6 +55,7 @@ No ESX or qb-inventory functions are used.
    ensure ox_lib
    ensure qbx_core
    ensure ox_inventory
+   ensure jg-advancedgarages
    ensure ox_target        # optional, for third-eye on the ped
    # … your appearance / spawn resources …
    ensure velora_starterpack
@@ -78,7 +83,7 @@ No ESX or qb-inventory functions are used.
 If the player closes the menu with ESC or ✕ before choosing, they can come back to the ped at any time.
 
 ### The ped (Legion Square car park)
-- **Position:** `Config.Ped.coords = vec4(215.76, -810.12, 30.73, 335.0)`. This is inside the Legion Square car park, a few metres from the qbx_garages "Pillbox Garage Parking" access point (`218.66, -804.08`), so it doesn't block the garage marker. To move it, stand where you want the ped, run `/coords` (or your own coordinate tool), and paste the x, y, z and heading. The z value is your standing height; the script handles placing the ped's feet on the ground.
+- **Position:** `Config.Ped.coords = vec4(215.76, -810.12, 30.73, 335.0)`. This is inside the Legion Square car park, about 5 m from jg-advancedgarages' `Legion Square` garage point (`215.09, -805.17`), so it doesn't block the garage. To move it, stand where you want the ped, run `/coords` (or your own coordinate tool), and paste the x, y, z and heading. The z value is your standing height; the script handles placing the ped's feet on the ground.
 - **Performance:** the ped is created locally on each client only within `spawnDistance` (60 m) and deleted when the player leaves, using `ox_lib` points. Nothing is networked and there are no idle loops. The `[E]` key check only runs while the player is within 2.5 m of the ped.
 - **Interaction:** `Config.Ped.interaction = 'auto'` uses ox_target when it is running, otherwise an ox_lib `[E]` text prompt. You can force `'ox_target'` or `'textui'`.
 - **Map blip:** a pink gift blip labelled "Velora Welcome Pack". Configure or disable it in `Config.Ped.blip`.
@@ -117,7 +122,7 @@ This only triggers once the character is fully in the world.
 | Partial failures | Every reward is a recorded step. Stackable items are one step; **non-stackable items are one step per unit**, because ox_inventory can partially fill non-stackables. Each step is written as `granting` before it is given and `granted` after. A retry only gives steps that are not `granted`. |
 | Crash or restart mid-claim | A step left in `granting` has an unknown outcome, so it is **never re-granted automatically**. It is flagged `review`, the claim is marked `needs_review`, and staff can see it in `/startercheck`. Duplicates are therefore impossible even across crashes. |
 | Completion | A claim is marked `completed` only after every step has been processed. Until then it stays `pending`, the path stays locked, and the player can finish with `/starterpack` (the UI opens in "Collect my rewards" mode). |
-| Vehicle | Created with `exports.qbx_vehicles:CreatePlayerVehicle({ model, citizenid, garage })` as its own recorded step. A refused creation (for example a cancelled event hook) is retried later. An error with an unknown outcome is flagged for review and never re-created automatically. Each creation is logged with the vehicle ID in `velora_starterpack_history`. |
+| Vehicle | Inserted into `player_vehicles` for jg-advancedgarages (`in_garage = 1`, `garage_id`) as its own recorded step, with a plate checked for uniqueness. If no plate can be generated, nothing is inserted and it is retried later. A database error with an unknown outcome is flagged for review and never re-inserted automatically. Each car is logged with its plate and row ID in `velora_starterpack_history`. |
 | Money | Granted through `exports.qbx_core:AddMoney(source, 'cash' / 'bank', amount, reason)` and saved with `exports.qbx_core:Save(source)`. Money is never added as raw items. |
 
 > A note on crash safety: qbx_core and ox_inventory also save player data on their own schedules. If the whole server crashes, data that hadn't been saved yet can be lost. This affects every resource, not just this one. This resource records its own progress immediately and forces a qbx player save after granting money and when a claim completes.
@@ -127,7 +132,8 @@ These APIs were checked against the current qbx_core and ox_inventory source:
 - `exports.qbx_core:GetPlayer`, `GetPlayerByCitizenId`, `AddMoney`, `Save`
 - `QBCore:Client:OnPlayerLoaded`, `QBCore:Client:OnPlayerUnload`, `qbx_core:client:playerLoggedOut`, `QBCore:Server:OnPlayerUnload`, `qb-clothes:client:CreateFirstCharacter`
 - `exports.ox_inventory:Items`, `GetInventory`, `AddItem`
-- `exports.qbx_vehicles:CreatePlayerVehicle`, `exports.qbx_garages:GetGarages`, `exports.qbx_core:GetVehiclesByName`
+- jg-advancedgarages: the `player_vehicles` columns from its `install/run-qb.sql` (`in_garage`, `garage_id`, …), its default `'Legion Square'` garage, and the `getAllGarages` export (used only for a start-up warning)
+- `exports.qbx_core:GetVehiclesByName`; for the optional qbx mode, `exports.qbx_vehicles:CreatePlayerVehicle` and `exports.qbx_garages:GetGarages`
 - `exports.ox_target:addLocalEntity`, `removeLocalEntity`; `lib.points`, `lib.showTextUI`, `lib.requestModel`
 
 ---
@@ -165,7 +171,7 @@ Everything is in `config.lua`:
 - `Config.AutoOpen`: enable, `mode` (`'notify'` or `'menu'`), waypoint, delay, stability window, max wait, appearance events, reopen on resource restart
 - `Config.Command`: the `/starterpack` command name or disable it
 - `Config.Rewards.standard`: items, `money = { cash, bank }` and `vehicles` for everyone
-- `Config.Vehicles`: default garage, friendly garage names, vehicle image URL
+- `Config.Vehicles`: garage system (`'jg-advancedgarages'` or `'qbx_garages'`), default garage, plate prefix, friendly garage names, vehicle image URL
 - `Config.Rewards.paths.civilian` / `.civilian2` / `.criminal` (and `pathOrder` for the card order): title, subtitle, description, tags, bonus items, optional extra money and optional `vehicles`
 - `Config.Inventory`: cash item name and icon path
 - `Config.Security`: cooldowns, DB lock timeout, spam-logging threshold
@@ -189,7 +195,8 @@ Open `web/index.html` in a desktop browser. Outside FiveM it runs a preview with
 ## Troubleshooting
 
 - **"The starter pack is temporarily unavailable"**: check the server console for `Config:` errors. Usually an item is missing from ox_inventory, a vehicle is missing from `qbx_core/shared/vehicles.lua`, or a garage name is wrong.
-- **Car not in the garage**: run `/startercheck [id]`. Look for `vehicle:issi8#1` under NEEDS REVIEW, and check `velora_starterpack_history` for the vehicle ID.
+- **Car not in the garage**: run `/startercheck [id]`. Look for `vehicle:issi8#1` under NEEDS REVIEW, and check `velora_starterpack_history` for the plate. Make sure the garage name in `config.lua` exactly matches the key in JG's `Config.GarageLocations`. A car with a `garage_id` that doesn't exist won't show in any JG garage.
+- **"player_vehicles is missing column(s): in_garage, garage_id"**: run jg-advancedgarages' `install/run-qb.sql` against your database.
 - **No arrival notification**: set `Config.Debug = true` and watch the F8 console for readiness messages. Another resource may be holding NUI focus. Players can still walk to the ped.
 - **Ped floating or sunk into the ground**: re-take the coordinates with `/coords` while standing on that spot. Use your standing height, not the ground height.
 - **"You need to be with the Velora welcome host…"**: the player is more than `maxServerDistance` from `Config.Ped.coords`. If you moved the ped, check that the coordinates you pasted are where it actually stands.

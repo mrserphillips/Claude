@@ -188,15 +188,29 @@ local function validateConfig()
         end
         if #list == 0 then return end
 
-        if GetResourceState('qbx_vehicles') ~= 'started' then
-            configErrors[#configErrors + 1] = ('%s.vehicles needs qbx_vehicles, which is not started'):format(where)
-            return
-        end
+        local system = Config.Vehicles.garageSystem
+        local garages -- qbx_garages: name -> config (validated strictly)
+        local jgGarages -- jg-advancedgarages: shape not documented, checked loosely
 
-        local garages
-        if GetResourceState('qbx_garages') == 'started' then
-            local ok, result = pcall(function() return exports.qbx_garages:GetGarages() end)
-            if ok and type(result) == 'table' then garages = result end
+        if system == 'jg-advancedgarages' then
+            if GetResourceState('jg-advancedgarages') ~= 'started' then
+                configErrors[#configErrors + 1] = ('%s.vehicles needs jg-advancedgarages, which is not started (ensure it before velora_starterpack)'):format(where)
+                return
+            end
+            local ok, result = pcall(function() return exports['jg-advancedgarages']:getAllGarages() end)
+            if ok and type(result) == 'table' then jgGarages = result end
+        elseif system == 'qbx_garages' then
+            if GetResourceState('qbx_vehicles') ~= 'started' then
+                configErrors[#configErrors + 1] = ('%s.vehicles needs qbx_vehicles, which is not started'):format(where)
+                return
+            end
+            if GetResourceState('qbx_garages') == 'started' then
+                local ok, result = pcall(function() return exports.qbx_garages:GetGarages() end)
+                if ok and type(result) == 'table' then garages = result end
+            end
+        else
+            configErrors[#configErrors + 1] = ('Config.Vehicles.garageSystem "%s" must be \'jg-advancedgarages\' or \'qbx_garages\''):format(tostring(system))
+            return
         end
 
         for i, entry in ipairs(list) do
@@ -213,6 +227,20 @@ local function validateConfig()
                     configErrors[#configErrors + 1] = ('%s.vehicles[%d] (%s) has no garage and no Config.Vehicles.defaultGarage'):format(where, i, entry.model)
                 elseif garages and not garages[garage] then
                     configErrors[#configErrors + 1] = ('garage "%s" for vehicle "%s" (%s) does not exist in qbx_garages'):format(garage, entry.model, where)
+                elseif jgGarages and next(jgGarages) then
+                    -- getAllGarages' exact format isn't documented, so only warn.
+                    local found = jgGarages[garage] ~= nil
+                    if not found then
+                        for _, g in pairs(jgGarages) do
+                            if type(g) == 'table' and (g.name == garage or g.id == garage or g.garageId == garage or g.label == garage) then
+                                found = true
+                                break
+                            end
+                        end
+                    end
+                    if not found then
+                        logWarn('Could not find garage "%s" (for %s) in jg-advancedgarages. Check it matches a key in JG\'s Config.GarageLocations exactly.', garage, entry.model)
+                    end
                 end
             end
         end
@@ -732,8 +760,95 @@ end
 
 -- Returns true if the given step was delivered, false if it provably was not,
 -- or nil if the outcome is unknown (an export threw mid-call).
+-- Columns that exist on player_vehicles (filled in when the database is ready).
+local vehicleColumns = nil
+local vehicleSchemaOk = true
+
+local PLATE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'
+
+local function generatePlate()
+    local prefix = tostring(Config.Vehicles.platePrefix or ''):upper():gsub('[^%w]', ''):sub(1, 6)
+    for _ = 1, 50 do
+        local plate = prefix
+        while #plate < 8 do
+            local n = math.random(1, #PLATE_CHARS)
+            plate = plate .. PLATE_CHARS:sub(n, n)
+        end
+        local taken = MySQL.scalar.await('SELECT 1 FROM `player_vehicles` WHERE `plate` = ? LIMIT 1', { plate })
+        if not taken then return plate end
+    end
+    return nil
+end
+
+-- jg-advancedgarages has no give-vehicle export: it reads owned vehicles from
+-- player_vehicles using its own in_garage / garage_id columns. We insert the
+-- same row a Qbox vehicle purchase would, with those columns set so the car
+-- shows as stored in the configured JG garage.
+local function createJgVehicle(src, step, citizenid)
+    if not vehicleColumns or not vehicleColumns.in_garage or not vehicleColumns.garage_id then
+        logError('player_vehicles is missing jg-advancedgarages columns (in_garage / garage_id). Run JG\'s install SQL.')
+        return false
+    end
+
+    local okPlate, plate = pcall(generatePlate)
+    if not okPlate or not plate then
+        logError('Could not generate a unique plate for %s: %s', step.model, tostring(plate))
+        return false
+    end
+
+    local player = getPlayer(src)
+    local hash = joaat(step.model)
+    local props = {}
+    for k, v in pairs(step.props or {}) do props[k] = v end
+    props.model = hash
+    props.plate = plate
+    props.fuelLevel = props.fuelLevel or 100
+    props.engineHealth = props.engineHealth or 1000
+    props.bodyHealth = props.bodyHealth or 1000
+
+    local values = {
+        license = player and player.PlayerData.license or nil,
+        citizenid = citizenid,
+        vehicle = step.model,
+        hash = tostring(hash),
+        mods = json.encode(props),
+        plate = plate,
+        garage_id = step.garage,
+        in_garage = 1,
+        -- Qbox's own columns, kept in sync for other scripts that read them.
+        garage = step.garage,
+        state = 1,
+    }
+
+    local cols, marks, params = {}, {}, {}
+    for _, col in ipairs({ 'license', 'citizenid', 'vehicle', 'hash', 'mods', 'plate', 'garage_id', 'in_garage', 'garage', 'state' }) do
+        if vehicleColumns[col] and values[col] ~= nil then
+            cols[#cols + 1] = ('`%s`'):format(col)
+            marks[#marks + 1] = '?'
+            params[#params + 1] = values[col]
+        end
+    end
+
+    local ok, insertId = pcall(MySQL.insert.await,
+        ('INSERT INTO `player_vehicles` (%s) VALUES (%s)'):format(table.concat(cols, ', '), table.concat(marks, ', ')), params)
+    if not ok then
+        logError('Inserting %s into player_vehicles failed: %s', step.model, tostring(insertId))
+        return nil
+    end
+    if not insertId or insertId == 0 then
+        logWarn('player_vehicles insert for %s returned no id', step.model)
+        return nil
+    end
+
+    logInfo('Created starter vehicle %s (plate %s, id %s) for %s in jg-advancedgarages garage "%s".', step.model, plate, tostring(insertId), citizenid, step.garage)
+    addHistory(citizenid, 'vehicle', nil, playerLabel(src), ('%s plate=%s id=%s garage=%s (jg)'):format(step.model, plate, tostring(insertId), step.garage))
+    return true
+end
+
 local function grantStep(src, step, citizenid)
-    if step.kind == 'vehicle' then
+    if step.kind == 'vehicle' and Config.Vehicles.garageSystem == 'jg-advancedgarages' then
+        return createJgVehicle(src, step, citizenid)
+    elseif step.kind == 'vehicle' then
         local ok, vehicleId, errResult = pcall(function()
             return exports.qbx_vehicles:CreatePlayerVehicle({
                 model = step.model,
@@ -944,7 +1059,7 @@ lib.callback.register('velora_starterpack:server:claim', function(src, data)
     lastClaim[src] = t
 
     if not Config.Enabled then return fail('disabled', Msg.disabled) end
-    if #configErrors > 0 then return fail('config', Msg.configError) end
+    if #configErrors > 0 or not vehicleSchemaOk then return fail('config', Msg.configError) end
     if not dbReady then return fail('db', Msg.dbError) end
 
     -- Strict input validation. The client only ever sends a path key + token.
@@ -1197,6 +1312,24 @@ MySQL.ready(function()
         return
     end
 
+    local columns = dbCall(MySQL.query.await, [[
+        SELECT COLUMN_NAME AS name FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'player_vehicles'
+    ]])
+    vehicleColumns = {}
+    for _, c in ipairs(columns or {}) do vehicleColumns[c.name] = true end
+
+    if Config.Vehicles.garageSystem == 'jg-advancedgarages' then
+        local missing = {}
+        for _, col in ipairs({ 'citizenid', 'vehicle', 'hash', 'mods', 'plate', 'in_garage', 'garage_id' }) do
+            if not vehicleColumns[col] then missing[#missing + 1] = col end
+        end
+        if #missing > 0 then
+            vehicleSchemaOk = false
+            logError('player_vehicles is missing column(s): %s. Run jg-advancedgarages\' install SQL (install/run-qb.sql). Starter vehicles cannot be given until this is fixed.', table.concat(missing, ', '))
+        end
+    end
+
     dbReady = true
     logInfo('Database ready (%d claim record(s)).', count)
 end)
@@ -1206,9 +1339,9 @@ CreateThread(function()
     validateConfig()
 end)
 
--- Re-validate if ox_inventory / qbx_vehicles / qbx_garages (re)start.
+-- Re-validate if ox_inventory or a garage resource (re)starts.
 AddEventHandler('onResourceStart', function(name)
-    if name == 'ox_inventory' or name == 'qbx_vehicles' or name == 'qbx_garages' then
+    if name == 'ox_inventory' or name == 'qbx_vehicles' or name == 'qbx_garages' or name == 'jg-advancedgarages' then
         SetTimeout(2000, validateConfig)
     end
 end)
