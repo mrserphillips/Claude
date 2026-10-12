@@ -173,6 +173,19 @@ Config.Rewards = {
             },
             money = { cash = 0, bank = 0 },
         },
+        civilian2 = {
+            label    = 'Civilian 2',
+            title    = 'THE CIVILIAN GRIND',
+            subtitle = 'Look sharp. Stack paper. Own the city.',
+            description = 'Clean cut and ambitious. Get your look right, put in the work, build your name and turn Velora City into your business.',
+            theme    = 'civilian2',
+            tags     = { 'Style', 'Business', 'Ambition' },
+            items = {
+                { name = 'silver_chain', count = 25 },
+                { name = 'breeze_bangs', count = 25 },
+            },
+            money = { cash = 0, bank = 0 },
+        },
         criminal = {
             label    = 'Criminal',
             title    = 'THE CRIMINAL UNDERWORLD',
@@ -189,7 +202,7 @@ Config.Rewards = {
     },
 
     -- Display order of the path cards in the UI.
-    pathOrder = { 'civilian', 'criminal' },
+    pathOrder = { 'civilian', 'civilian2', 'criminal' },
 }
 
 -- Reason string passed to qbx_core AddMoney (shows in money logs).
@@ -284,6 +297,8 @@ Config.UI = {
         textMuted   = 'rgba(255, 235, 245, 0.68)',
         criminal    = '#8b2cff',
         criminalRed = '#b3122e',
+        silver      = '#d6dde8', -- Civilian 2 card
+        steel       = '#4b5566', -- Civilian 2 card
     },
     text = {
         brand          = 'VELORA CITY',

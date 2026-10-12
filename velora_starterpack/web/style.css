@@ -13,6 +13,8 @@
     --muted: rgba(255, 235, 245, 0.68);
     --crim: #8b2cff;
     --crim-red: #b3122e;
+    --silver: #d6dde8;
+    --steel: #4b5566;
 
     --radius: 22px;
     --radius-sm: 14px;
@@ -125,7 +127,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .screen::-webkit-scrollbar { width: 6px; }
 .screen::-webkit-scrollbar-thumb { background: rgba(255, 79, 163, .4); border-radius: 3px; }
 
-.screen-select > * { max-width: 1320px; margin-left: auto; margin-right: auto; }
+.screen-select > * { max-width: 1560px; margin-left: auto; margin-right: auto; }
 
 /* ---------- Hero ---------- */
 .hero { text-align: center; margin-bottom: clamp(16px, 3vh, 34px); animation: rise .9s var(--ease) both; }
@@ -175,7 +177,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 /* ---------- Path cards ---------- */
 .paths {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
     gap: clamp(16px, 2.2vw, 36px);
     margin-bottom: clamp(18px, 3vh, 34px);
 }
@@ -412,6 +414,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 }
 .dot { width: 9px; height: 9px; border-radius: 50%; }
 .dot-civ { background: var(--pink); box-shadow: 0 0 10px var(--pink); }
+.dot-civ2 { background: var(--silver); box-shadow: 0 0 10px var(--silver); }
 .dot-crim { background: var(--crim); box-shadow: 0 0 10px var(--crim); margin-right: 6px; }
 
 .reward-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
@@ -542,6 +545,43 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 @keyframes tileIn { from { opacity: 0; transform: translateY(18px) scale(.94); } to { opacity: 1; transform: none; } }
 
 .review-note { margin-top: 18px; color: #ffd98a; font-size: 13px; }
+
+/* ---------- Civilian 2 theme (steel & silver with a Velora pink edge) ---------- */
+.card.theme-civilian2 { --c1: var(--silver); --c2: var(--pink); --glow: rgba(214, 221, 232, .35); }
+.card.theme-civilian2 .card-inner { background: linear-gradient(170deg, rgba(20, 22, 30, .94), rgba(8, 8, 12, .96)); }
+.theme-civilian2 .sky {
+    background:
+        radial-gradient(circle at 70% 28%, rgba(230, 236, 245, .45), transparent 18%),
+        linear-gradient(180deg, #8d99ad 0%, #4b5566 38%, #3a2a3e 72%, #120c14 100%);
+}
+.theme-civilian2 .skyline { fill: rgba(12, 14, 20, .92); }
+.theme-civilian2 .skyline .win { fill: rgba(230, 238, 250, .85); }
+.theme-civilian2 .card-art::after {
+    content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%;
+    background: linear-gradient(100deg, transparent, rgba(220, 230, 245, .3), transparent);
+    animation: shimmer 5.5s ease-in-out infinite;
+}
+.theme-civilian2 .card-title { background: linear-gradient(90deg, #fff, var(--silver) 55%, #9aa6b8); -webkit-background-clip: text; background-clip: text; }
+.theme-civilian2 .card-subtitle,
+.theme-civilian2 .section-label { color: var(--silver); }
+.theme-civilian2 .tag { background: rgba(214, 221, 232, .08); border-color: rgba(214, 221, 232, .35); color: var(--silver); }
+.theme-civilian2 .tile:hover { background: rgba(214, 221, 232, .08); border-color: rgba(214, 221, 232, .4); }
+.theme-civilian2 .tile-img { background: radial-gradient(circle at 50% 35%, rgba(214, 221, 232, .22), rgba(0, 0, 0, .3)); }
+.theme-civilian2 .tile-img .fallback { color: var(--silver); }
+.theme-civilian2 .tile-count { color: var(--silver); }
+.theme-civilian2 .btn-primary {
+    background: linear-gradient(135deg, #8a95a8, var(--steel));
+    box-shadow: 0 8px 26px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+.theme-civilian2 .btn-primary:hover { box-shadow: 0 12px 34px rgba(214, 221, 232, .25), 0 0 30px rgba(255, 79, 163, .3); }
+.modal.theme-civilian2 { border-color: rgba(214, 221, 232, .45); box-shadow: 0 30px 90px rgba(0, 0, 0, .6), 0 0 60px rgba(214, 221, 232, .15); }
+.modal.theme-civilian2 .modal-icon { background: radial-gradient(circle, rgba(214, 221, 232, .3), rgba(214, 221, 232, .04)); border-color: rgba(214, 221, 232, .55); box-shadow: 0 0 30px rgba(214, 221, 232, .25); }
+.modal.theme-civilian2 .btn-primary { background: linear-gradient(135deg, #8a95a8, var(--steel)); }
+.path-badge.theme-civilian2 { background: rgba(214, 221, 232, .1); border-color: rgba(214, 221, 232, .45); color: var(--silver); }
+
+/* Three cards side by side: tighten the cards so they fit comfortably. */
+.card:nth-child(3) { animation-delay: .24s; }
+.paths .bonus-list { grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 600px) {

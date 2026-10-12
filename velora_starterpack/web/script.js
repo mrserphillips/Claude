@@ -54,7 +54,14 @@
     };
     const money = (n) => '$' + Math.max(0, Math.floor(Number(n) || 0)).toLocaleString('en-US');
     const txt = (key, fallback) => (state.data && state.data.ui && state.data.ui.text && state.data.ui.text[key]) || fallback;
-    const themeOf = (path) => (path && path.theme === 'criminal') ? 'criminal' : 'civilian';
+    const THEMES = ['civilian', 'civilian2', 'criminal'];
+    const themeOf = (path) => (path && THEMES.includes(path.theme)) ? path.theme : 'civilian';
+    const THEME_ICONS = {
+        civilian: ['briefcase', 'bag', 'diamond'],
+        civilian2: ['watch', 'chain', 'car'],
+        criminal: ['mask', 'dice', 'lamp'],
+    };
+    const CONFIRM_ICON = { civilian: 'diamond', civilian2: 'watch', criminal: 'mask' };
     const setText = (id, value) => { const n = $(id); if (n && value !== undefined) n.textContent = value; };
 
     const ICONS = {
@@ -66,6 +73,8 @@
         mask: '<svg viewBox="0 0 24 24"><path d="M3 8c3-2 15-2 18 0 0 6-3 10-9 10S3 14 3 8z"/><path d="M7 11h3M14 11h3"/></svg>',
         dice: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r=".9"/><circle cx="15" cy="15" r=".9"/><circle cx="15" cy="9" r=".9"/><circle cx="9" cy="15" r=".9"/></svg>',
         lamp: '<svg viewBox="0 0 24 24"><path d="M12 21V8M8 8h8l-2-4h-4L8 8zM9 21h6"/></svg>',
+        watch: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5.5"/><path d="M12 9.5V12l1.6 1.2M9 6.8L9.6 3h4.8l.6 3.8M9 17.2l.6 3.8h4.8l.6-3.8"/></svg>',
+        chain: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>',
         car: '<svg viewBox="0 0 24 24"><path d="M5 16h14v-3.5l-1.6-4.2A2 2 0 0015.5 7h-7a2 2 0 00-1.9 1.3L5 12.5V16z"/><path d="M5 12.5h14M3.5 11l1.5 1.5M20.5 11L19 12.5"/><circle cx="8" cy="16.5" r="1.6"/><circle cx="16" cy="16.5" r="1.6"/></svg>',
         journey: '<svg viewBox="0 0 24 24"><path d="M12 2l2.5 6.5L21 9l-5 4.5L17.5 21 12 17l-5.5 4L8 13.5 3 9l6.5-.5L12 2z"/></svg>',
     };
@@ -79,13 +88,15 @@
         s.setAttribute('class', 'skyline');
 
         // Deterministic pseudo-random so both cards always look the same.
-        let seed = theme === 'criminal' ? 7 : 3;
+        let seed = { civilian: 3, civilian2: 5, criminal: 7 }[theme] || 3;
+        const tall = theme === 'civilian2' ? [60, 85] : theme === 'criminal' ? [40, 70] : [50, 95];
+        const lit = theme === 'civilian2' ? 0.7 : theme === 'criminal' ? 0.86 : 0.62;
         const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
 
         let x = 0;
         while (x < 400) {
             const w = 18 + Math.floor(rnd() * 34);
-            const h = theme === 'criminal' ? 40 + rnd() * 70 : 50 + rnd() * 95;
+            const h = tall[0] + rnd() * tall[1];
             const b = document.createElementNS(ns, 'rect');
             b.setAttribute('x', x); b.setAttribute('y', 150 - h);
             b.setAttribute('width', w); b.setAttribute('height', h);
@@ -93,7 +104,7 @@
 
             for (let wy = 150 - h + 8; wy < 142; wy += 11) {
                 for (let wx = x + 4; wx < x + w - 5; wx += 8) {
-                    if (rnd() > (theme === 'criminal' ? 0.86 : 0.62)) {
+                    if (rnd() > lit) {
                         const win = document.createElementNS(ns, 'rect');
                         win.setAttribute('x', wx); win.setAttribute('y', wy);
                         win.setAttribute('width', 3); win.setAttribute('height', 4);
@@ -114,7 +125,7 @@
         const map = {
             primary: '--pink', primaryGlow: '--pink-glow', accent: '--pink-soft', roseGold: '--rose-gold',
             background: '--bg', surface: '--surface', text: '--text', textMuted: '--muted',
-            criminal: '--crim', criminalRed: '--crim-red',
+            criminal: '--crim', criminalRed: '--crim-red', silver: '--silver', steel: '--steel',
         };
         for (const [key, cssVar] of Object.entries(map)) {
             if (typeof colors[key] === 'string') document.documentElement.style.setProperty(cssVar, colors[key]);
@@ -227,7 +238,7 @@
             }
             art.appendChild(skyline(theme));
             const icons = el('div', 'card-icons');
-            (theme === 'criminal' ? ['mask', 'dice', 'lamp'] : ['briefcase', 'bag', 'diamond']).forEach((k) => {
+            THEME_ICONS[theme].forEach((k) => {
                 const ic = el('div', 'ic');
                 ic.appendChild(svg(ICONS[k]));
                 icons.appendChild(ic);
@@ -305,12 +316,12 @@
 
         const theme = themeOf(path);
         const box = $('confirmBox');
-        box.classList.remove('theme-civilian', 'theme-criminal');
+        box.classList.remove(...THEMES.map((t) => `theme-${t}`));
         box.classList.add(`theme-${theme}`);
 
         const icon = $('confirmIcon');
         icon.innerHTML = '';
-        icon.appendChild(svg(theme === 'criminal' ? ICONS.mask : ICONS.diamond));
+        icon.appendChild(svg(ICONS[CONFIRM_ICON[theme]]));
 
         // Bold the path name inside the configurable sentence.
         const template = txt('confirmText', 'Are you sure you want to begin your Velora journey as a %s? This choice cannot be changed.');
@@ -644,6 +655,14 @@
                 description: 'Every empire starts somewhere. Set up your business, sell your products, meet new people and make your fortune in Velora City.',
                 tags: ['Business', 'Shopping', 'Luxury'],
                 items: [{ name: 'bodywavewigs', label: 'Body Wave Wigs', count: 25, image: img('bodywavewigs') }, { name: 'pink_messenger_bag', label: 'Pink Messenger Bag', count: 25, image: img('pink_messenger_bag') }],
+                money: { cash: 0, bank: 0 },
+            },
+            {
+                key: 'civilian2', label: 'Civilian 2', theme: 'civilian2', title: 'THE CIVILIAN GRIND',
+                subtitle: 'Look sharp. Stack paper. Own the city.',
+                description: 'Clean cut and ambitious. Get your look right, put in the work, build your name and turn Velora City into your business.',
+                tags: ['Style', 'Business', 'Ambition'],
+                items: [{ name: 'silver_chain', label: 'Silver Chain', count: 25, image: img('silver_chain') }, { name: 'breeze_bangs', label: 'Breeze Bangs', count: 25, image: img('breeze_bangs') }],
                 money: { cash: 0, bank: 0 },
             },
             {

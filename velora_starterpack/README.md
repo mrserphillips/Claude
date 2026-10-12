@@ -2,7 +2,15 @@
 
 A premium "choose your path" starter pack for **Qbox (qbx_core)**, **ox_inventory**, **ox_lib** and **oxmysql**.
 
-New characters visit the **Velora welcome host**, a ped standing in the **Legion Square car park**, and choose **THE CIVILIAN DREAM** or **THE CRIMINAL UNDERWORLD**. Both paths get the standard starter rewards plus the bonus for their path. Each character can claim once, and the claim is enforced by the database.
+New characters visit the **Velora welcome host**, a ped standing in the **Legion Square car park**, and choose one of three paths:
+
+| Path | Card | Bonus items |
+|---|---|---|
+| **THE CIVILIAN DREAM** (`civilian`) | Pink & rose gold | `bodywavewigs` x25, `pink_messenger_bag` x25 |
+| **THE CIVILIAN GRIND** (`civilian2`) | Steel & silver | `silver_chain` x25, `breeze_bangs` x25 |
+| **THE CRIMINAL UNDERWORLD** (`criminal`) | Black, purple & red | `ls_og_kush_bag` x25, `ls_og_kush_seed` x25 |
+
+Every path also gets the standard starter rewards: the items, cash, bank and the Weeny Issi Rally. Each character can claim **one** path once, and the claim is enforced by the database.
 
 ---
 
@@ -29,7 +37,7 @@ No ESX or qb-inventory functions are used.
    > **Live server?** Every existing character counts as "unclaimed". To give the pack only to characters created from now on, run the optional `INSERT IGNORE … SELECT citizenid FROM players` block at the bottom of `sql/install.sql` once.
 
 3. **Items.** Every reward item must exist in `ox_inventory/data/items.lua`:
-   `phone`, `cos_sprunk`, `bbs_double_cheese_goat`, `lockpick`, `pumpkin_patch_card`, `bodywavewigs`, `pink_messenger_bag`, `ls_og_kush_bag`, `ls_og_kush_seed`.
+   `phone`, `cos_sprunk`, `bbs_double_cheese_goat`, `lockpick`, `pumpkin_patch_card`, `bodywavewigs`, `pink_messenger_bag`, `silver_chain`, `breeze_bangs`, `ls_og_kush_bag`, `ls_og_kush_seed`.
    On start, the resource prints a clear `ERROR` line for each missing item. **Claims are blocked until the problem is fixed**, so nobody receives a broken pack. Item icons come from `ox_inventory/web/images/<item>.png`; if an icon is missing, the UI shows a styled letter instead.
 
 4. **Starter vehicle (Weeny Issi Rally, `issi8`).** Every character gets one, stored in the **Legion Square car park** garage (`pillboxgarage` in qbx_garages), right next to the welcome host. `issi8` is already in `qbx_core/shared/vehicles.lua`. It's a newer GTA vehicle from The Chop Shop update, so your server needs a recent game build, for example `sv_enforceGameBuild 3095` or higher in server.cfg. On an older build the vehicle won't spawn from the garage.
@@ -100,7 +108,7 @@ This only triggers once the character is fully in the world.
 
 | Threat | Protection |
 |---|---|
-| Claiming twice / both paths | `UNIQUE(citizenid)` claim row. The first confirmation locks the path and any later request for another path is rejected. |
+| Claiming twice / more than one path | `UNIQUE(citizenid)` claim row. The first confirmation locks the path and any later request for another path is rejected. |
 | Tracking by FiveM account | Claims are keyed on the Qbox **citizenid**. The license is stored only for auditing. |
 | Forged rewards from the client | The client sends only `{ path, token }`. Items, counts and money come from `config.lua`, which is loaded **server-only** and never sent to clients. |
 | Opening without the menu | The server issues a one-time session token when it opens the menu. A claim without a valid token for the current character is rejected. |
@@ -158,7 +166,7 @@ Everything is in `config.lua`:
 - `Config.Command`: the `/starterpack` command name or disable it
 - `Config.Rewards.standard`: items, `money = { cash, bank }` and `vehicles` for everyone
 - `Config.Vehicles`: default garage, friendly garage names, vehicle image URL
-- `Config.Rewards.paths.civilian` / `.criminal`: title, subtitle, description, tags, bonus items, optional extra money and optional `vehicles`
+- `Config.Rewards.paths.civilian` / `.civilian2` / `.criminal` (and `pathOrder` for the card order): title, subtitle, description, tags, bonus items, optional extra money and optional `vehicles`
 - `Config.Inventory`: cash item name and icon path
 - `Config.Security`: cooldowns, DB lock timeout, spam-logging threshold
 - `Config.Admin`: ACE name, command names, reset confirmation window
