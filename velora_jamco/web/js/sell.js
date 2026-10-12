@@ -51,7 +51,7 @@ VJ.apps.sell = (() => {
                 <div class="avatar">${avatarSvg(cust.type)}</div>
                 <div class="grow">
                     <div class="row between"><div><b style="font-family:Cinzel;font-size:1.3em;letter-spacing:.06em">${esc(cust.name)}</b>
-                        <div class="muted small">${esc(cust.typeLabel)}${cust.preference ? ` · loves ${esc(cust.preference.toLowerCase())}` : ''}${cust.bulk ? ` · wants ${cust.bulk} jars` : ''}</div></div>
+                        <div class="muted small">${esc(cust.typeLabel)}${cust.preference ? ` · loves ${esc(cust.preference.toLowerCase())}` : ''}${` · wants ${cust.want || 1} jar${(cust.want || 1) > 1 ? 's' : ''}`}</div></div>
                         <button class="close-btn" data-close title="Walk away (Esc)">✕</button></div>
                     <div class="row" style="margin-top:8px;gap:18px"><div class="mood">Mood <div class="bar"><i id="moodBar" style="width:${mood}%"></i></div></div>
                         <div class="mood">Patience <div class="patience" id="pat"></div></div></div>

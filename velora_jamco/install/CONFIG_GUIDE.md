@@ -76,12 +76,17 @@ bush('gs_rasp_1', 'raspberry', x, y, z)
 Fruit can't be bought, jam can only be sold to NPCs (with cooldowns), and supplies can't be sold back, so there is no money loop.
 
 ## 7. Selling: `Config.Selling`
+With `/selljam` on, customers walk up to you one at a time. Press **E** (or use ox_target) to serve them.
+
 | Setting | What it controls |
 |---|---|
 | `Command` | The command name (default `selljam`) |
-| `PedCooldown` | Seconds before the same ped can be approached again |
-| `RejectChance`, `MaxConsecutiveRejects` | Fair rejections: after the maximum in a row, the next customer always listens |
-| `AllowedPopTypes` | Only ambient population peds can be customers, so scripted NPCs are never touched |
+| `FirstCustomerDelay`, `CustomerInterval` | Seconds before the first customer, and between customers |
+| `SpawnDistance` | How far away (metres) a customer starts walking from |
+| `ArriveTimeout`, `WaitTimeout` | How long a customer walks, then waits, before giving up |
+| `ServeDistance`, `ServeKey` | How close they stop, and the serve key (38 = E) |
+| `Quantity` | Weights for wanting 1, 2 or 3 jars. They buy fewer if you have fewer |
+| `CustomerModels` | Ped models customers can use |
 | `CustomerTypes` | Weights, price ranges, haggle room, patience and the pitch each type likes |
 
 ## 8. Other settings

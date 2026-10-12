@@ -42,11 +42,12 @@
 - **Still stuck:** run `/ensure velora_jamco` from the server console, then check F8 for errors.
 
 ## `/selljam`
-- **Nobody can be targeted:**
-  - Selling mode must be on (check the notification).
-  - You must not be in a vehicle.
-  - The ped must be ambient population. Scripted and mission peds are ignored on purpose.
-- **"Already sold to them":** every ped has a cooldown (`Config.Selling.PedCooldown`).
+- **No customer turns up:**
+  - Check the notification to make sure selling mode is on.
+  - You must be on foot and must not have a menu open.
+  - The first customer arrives after `FirstCustomerDelay` and later ones after `CustomerInterval`.
+- **The customer gave up:** they leave if you drive off, walk more than 80 m away, or don't serve them within `WaitTimeout`. The next one comes after the interval.
+- **No E prompt:** stand within `ServeDistance`. You can also target the customer with ox_target.
 - **Selling mode turned itself off:** you ran out of jars.
 
 ## Logs

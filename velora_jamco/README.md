@@ -37,7 +37,7 @@ Built for QBox (`qbx_core`), `ox_inventory`, `ox_target`, `ox_lib` and `oxmysql`
   | 95–100 | Perfect Batch |
 
   Quality is stored in metadata along with recipe, rarity, batch and maker. Jars stack only within a batch, and every recipe shows its own jar icon in ox_inventory.
-- **`/selljam`:** works with ambient population peds only (nothing is spawned). There are 5 customer types, flavour preferences, bulk orders, sales pitches, counteroffers, mood and patience, per-ped cooldowns and market saturation.
+- **`/selljam`:** customers walk up to you one at a time. Press E or target them to serve. Each wants 1–3 jars and buys fewer if you have fewer. There are 5 customer types, favourite flavours, sales pitches, counteroffers with mood and patience, and market saturation. Customers are local to the seller, so the city population is never touched.
 - **Server-authoritative:** the server owns:
   - every reward, payout and inventory change
   - every distance check

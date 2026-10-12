@@ -353,16 +353,22 @@ Config.Discovery = {
 -- ─────────────────────────────────────────────────────────────────────────
 Config.Selling = {
     Command = 'selljam',
-    InteractDistance = 2.0,
-    MaxDistance = 4.0,            -- server-side check between player and customer
-    PedCooldown = 900,            -- seconds before the same NPC can be approached again
-    ApproachCooldown = 6,         -- seconds between approaches for one player
-    RejectChance = 0.15,          -- chance a customer is simply not interested
-    MaxConsecutiveRejects = 2,    -- after this many rejections in a row the next one always listens
-    NegotiationTimeout = 120,     -- seconds before an open conversation expires
-    BulkBonus = 0.06,             -- per extra jar in a bulk order
-    -- Only ambient population peds can be customers (never scripted / mission peds)
-    AllowedPopTypes = { [1] = true, [2] = true, [3] = true, [4] = true, [5] = true },
+    -- Customers walk up to you while selling mode is on. Only one customer at a time.
+    FirstCustomerDelay = { 4, 10 },   -- seconds after /selljam before the first customer appears
+    CustomerInterval = { 15, 35 },    -- seconds between customers (after the previous one leaves)
+    SpawnDistance = { 16, 26 },       -- metres away the customer starts walking from
+    ArriveTimeout = 60,               -- seconds a customer may take to reach you before giving up
+    WaitTimeout = 45,                 -- seconds a customer waits beside you to be served
+    ServeDistance = 2.5,              -- how close they stop / how close you must be to serve them
+    ServeKey = 38,                    -- control id for the serve prompt (38 = E)
+    -- How many jars a customer wants (weights). They buy fewer if you have fewer of that jam.
+    Quantity = { { amount = 1, weight = 55 }, { amount = 2, weight = 30 }, { amount = 3, weight = 15 } },
+    NegotiationTimeout = 120,         -- seconds before an open conversation expires
+    BulkBonus = 0.06,                 -- price bonus per extra jar in one sale
+    CustomerModels = {
+        'a_f_y_hipster_01', 'a_f_y_hipster_03', 'a_f_m_bevhills_01', 'a_f_y_tourist_01', 'a_f_m_fatwhite_01',
+        'a_m_y_hipster_01', 'a_m_m_farmer_01', 'a_m_y_business_02', 'a_m_m_hillbilly_01', 'a_f_y_genhot_01',
+    },
 
     -- Market saturation: every jar of a recipe sold lowers its price a little, recovering over time
     Market = { perSale = 0.025, floor = 0.65, recoverPerMinute = 0.01 },
@@ -373,7 +379,7 @@ Config.Selling = {
         { id = 'foodie',    label = 'Foodie',         weight = 22, mult = { 0.98, 1.12 }, haggle = 0.16, patience = 3, likes = 'flavour', rarityBonus = 0.10 },
         { id = 'bargain',   label = 'Bargain Hunter', weight = 18, mult = { 0.72, 0.86 }, haggle = 0.28, patience = 4, likes = 'deal' },
         { id = 'collector', label = 'Collector',      weight = 10, mult = { 1.02, 1.20 }, haggle = 0.10, patience = 2, likes = 'rarity', minRarity = 'rare' },
-        { id = 'cafe',      label = 'Café Owner',     weight = 12, mult = { 0.92, 1.04 }, haggle = 0.10, patience = 3, likes = 'quality', bulk = { 2, 4 } },
+        { id = 'cafe',      label = 'Café Owner',     weight = 12, mult = { 0.92, 1.04 }, haggle = 0.10, patience = 3, likes = 'quality' },
     },
     FlavourPreferenceChance = 0.45,  -- chance a customer has a favourite fruit
     FlavourBonus = 0.18,             -- extra paid when the jam contains their favourite fruit
