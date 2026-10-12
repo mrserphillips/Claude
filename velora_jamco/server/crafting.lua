@@ -307,7 +307,7 @@ local function finishSession(src, session)
         maker = maker,
         made = os.date('%d/%m/%Y'),
         fruits = table.concat(session.parsed.fruits, ','),
-        imageurl = Config.JamImageUrl:format(recipe.image),
+        imageurl = (Config.JamImageUrl or ('nui://' .. GetCurrentResourceName() .. '/web/images/jams/%s.png')):format(recipe.image),
         description = ('%s • %s\nQuality %d%% (%s)\nIngredients: %s\nBatch %s • Made by %s'):format(
             rarity.label, label, quality, tier.label, table.concat(fruitLabels, ', '), batch, maker),
     }

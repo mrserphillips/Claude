@@ -1,7 +1,7 @@
 /* Velora Jam Co. — NUI core: messaging, focus, helpers, overlays */
 'use strict';
 
-const UI_VERSION = '1.2.1';
+const UI_VERSION = '1.2.2';
 const RES = typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'velora_jamco';
 const VJ = { app: null, apps: {}, data: null };
 
@@ -234,8 +234,10 @@ function loadImage(src) {
 }
 
 /* Signal readiness (Lua side ignores unknown callbacks safely) */
-window.addEventListener('load', () => {
+// tell Lua which UI build actually loaded (shown by /jamversion); scripts may be injected after 'load'
+function reportReady() {
     document.body.dataset.ready = '1';
-    // tell Lua which UI build actually loaded (shown by /jamversion)
     post('uiVersion', { version: UI_VERSION });
-});
+}
+if (document.readyState === 'complete') setTimeout(reportReady, 0);
+else window.addEventListener('load', reportReady);

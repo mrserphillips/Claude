@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Velora Jam Co.</title>
+</head>
+<body>
+    <div id="root" class="hidden">
+        <div class="backdrop"></div>
+        <section id="app-business" class="app panel hidden"></section>
+        <section id="app-kitchen" class="app panel hidden"></section>
+        <section id="app-harvest" class="app harvest hidden"></section>
+        <section id="app-sell" class="app sell hidden"></section>
+    </div>
+    <div id="reveal" class="hidden"></div>
+    <div id="toasts"></div>
+    <div id="vj-version"></div>
+
+    <!-- Loader: fetches the stylesheet and scripts with caching disabled so FiveM can never
+         show an old copy of the UI. If fetching fails for any reason it falls back to normal tags. -->
+    <script>
+    (function () {
+        var SCRIPTS = ['core', 'sfx', 'book', 'business', 'art', 'harvest', 'minigames', 'kitchen', 'sell'];
+
+        function tag(name, src, done) {
+            var el = document.createElement(name);
+            if (name === 'link') { el.rel = 'stylesheet'; el.href = src; }
+            else { el.src = src; el.async = false; }
+            el.onload = el.onerror = function () { done(); };
+            (name === 'link' ? document.head : document.body).appendChild(el);
+        }
+
+        function fresh(url) {
+            return fetch(url, { cache: 'no-store' }).then(function (r) {
+                if (!r.ok) throw new Error(r.status);
+                return r.text();
+            });
+        }
+
+        function loadCss(done) {
+            fresh('css/style.css').then(function (css) {
+                var st = document.createElement('style');
+                st.textContent = css.split('../fonts/').join('fonts/');
+                document.head.appendChild(st);
+                done();
+            }).catch(function () { tag('link', 'css/style.css', done); });
+        }
+
+        function loadScript(i) {
+            if (i >= SCRIPTS.length) { window.dispatchEvent(new Event('vj-ready')); return; }
+            var src = 'js/' + SCRIPTS[i] + '.js';
+            fresh(src).then(function (code) {
+                var s = document.createElement('script');
+                s.textContent = code + '\n//# sourceURL=' + src;
+                document.body.appendChild(s);
+                loadScript(i + 1);
+            }).catch(function () { tag('script', src, function () { loadScript(i + 1); }); });
+        }
+
+        loadCss(function () { loadScript(0); });
+    })();
+    </script>
+</body>
+</html>

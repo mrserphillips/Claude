@@ -7,14 +7,14 @@
 - **A vehicle key script.** `qbx_vehiclekeys` works by default. See `Config.VehicleKeys` for the other supported scripts.
 
 ## Steps
-1. **Copy the resource.** Put the `velora_jamco` folder into your resources, for example `resources/[velora]/velora_jamco`. Keep the folder name exactly `velora_jamco`, because the jam icons are served from `nui://velora_jamco/...`.
+1. **Copy the resource.** Put the folder into your resources, for example `resources/[velora]/velora_jamco`. Any folder name works, but use the same name in `ensure`. When updating, delete the old folder first instead of copying over it.
 
 2. **Database.** The tables are created automatically the first time the resource starts. If you prefer to create them yourself, run `sql/install.sql`.
 
 3. **Items.**
    - Open `install/ox_inventory_items.lua` and paste every entry into `ox_inventory/data/items.lua`, inside the `return { }` table.
    - Copy every PNG from `velora_jamco/web/images/items/` into `ox_inventory/web/images/`.
-   - You don't need to copy the per-recipe jar icons in `web/images/jams/`. Each jar's metadata includes an `imageurl` that points at this resource.
+   - You don't need to copy the per-recipe jar icons in `web/images/jams/`. Each jar's metadata includes an `imageurl` that points at this resource, whatever its folder is called.
 
 4. **server.cfg.** Make sure the dependencies start before this resource:
    ```cfg

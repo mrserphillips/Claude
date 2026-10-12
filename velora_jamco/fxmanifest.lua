@@ -6,7 +6,7 @@ use_experimental_fxv2_oal 'yes'
 name 'velora_jamco'
 author 'Velora RP'
 description 'Velora Jam Co. - fruit harvesting, jam making, recipe discovery and NPC selling'
-version '1.2.1'
+version '1.2.2'
 
 dependencies {
     '/onesync',
@@ -42,18 +42,23 @@ server_scripts {
     'server/selling.lua',
 }
 
-ui_page 'web/ui.html'
+ui_page 'web/index.html'
 
 files {
-    'web/ui.html',
+    'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
     'web/fonts/*.woff2',
     'web/images/items/*.png',
     'web/images/jams/*.png',
     'web/images/ui/*.png',
-    'web/images/minigames/*.png',
+    -- FiveM does not support wildcards in folder names, so each art folder is listed.
+    -- If you add art to a new folder (e.g. seal/ or a background .jpg), add a line for it here.
     'web/images/minigames/*.jpg',
-    'web/images/minigames/*/*.png',
-    'web/images/minigames/*/*.jpg',
+    'web/images/minigames/fruit/*.png',
+    'web/images/minigames/heat/*.png',
+    'web/images/minigames/stir/*.png',
+    'web/images/minigames/fill/*.png',
+    'web/images/minigames/prepare/*.png',
+    'web/images/minigames/harvest/*.png',
 }

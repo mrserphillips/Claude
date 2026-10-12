@@ -3,10 +3,7 @@
 ## Items or icons are missing
 - **Item doesn't show up at all:** add the entries from `install/ox_inventory_items.lua` to `ox_inventory/data/items.lua`, then restart ox_inventory.
 - **Plain grey item icons:** copy `web/images/items/*.png` into `ox_inventory/web/images/`.
-- **Jar icons are blank:**
-  - The resource folder must be named exactly `velora_jamco`.
-  - If you renamed it, update `Config.JamImageUrl` to match.
-  - Jars crafted before the rename keep the old URL in their metadata.
+- **Jar icons are blank:** jars made before v1.2.2 stored the image address with the folder name `velora_jamco`. Newly made jars use your folder's real name automatically.
 
 ## Starting a shift or spawning a van
 - **"All van bays are occupied":** clear the `Config.Van.Spawns` area or add more spawn points.
@@ -19,6 +16,9 @@
 - **Server restarted or player crashed mid-shift:**
   - On a restart, deposits are refunded to online players when the resource stops.
   - If a player crashed, their refund is queued and paid automatically the next time they log in.
+
+## "could not find file" warnings
+The console warns `could not find file ...` when a line in `fxmanifest.lua` matches no files. Wildcards in folder names (`*/*.png`) are not supported by FiveM, so every art folder is listed separately.
 
 ## The UI looks old after an update
 Type **`/jamversion`** in game. It shows the server, client and UI versions, plus the folder the server is running from.

@@ -155,8 +155,9 @@ Config.Supplies = {
 Config.JamItem = 'velora_jam'
 
 -- Per-recipe jar icons are served straight from this resource through metadata.imageurl,
--- so they show in ox_inventory without copying 40+ images.
-Config.JamImageUrl = 'nui://velora_jamco/web/images/jams/%s.png'
+-- so they show in ox_inventory without copying 40+ images. Works whatever the resource folder is called.
+-- Leave as nil, or set your own URL pattern with a %s for the image name.
+Config.JamImageUrl = nil
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Supplier shop (ox_inventory shop, opened from the business NPC)

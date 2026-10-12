@@ -4,7 +4,8 @@ Every minigame can use painted or photographed artwork instead of the built-in d
 
 - **Where files go:** save each image into `web/images/minigames/` using the exact path in the tables below.
 - **Optional:** every file is optional. If a file is missing, the game draws its own version of that piece, so you can add art one piece at a time.
-- **To see new art:** restart the resource (`ensure velora_jamco`). You don't need to rebuild anything.
+- **To see new art:** restart the resource. You don't need to rebuild anything.
+- **New folders:** FiveM can't use wildcards in folder names. If you add art in a folder that isn't listed in `fxmanifest.lua` yet (for example `seal/`, or a `.jpg` background inside a stage folder), add a matching line such as `'web/images/minigames/seal/*.png',` to its `files` list, then run `refresh`.
 - **Sizing guides:** run `python3 tools/gen_art_templates.py` to create a template PNG for every file in `install/art-templates/`. Each one is the exact size to deliver, with guides showing where the game paints jam and where pivot points sit. They aren't shipped with the resource because the game doesn't use them.
 
 ## Art already included

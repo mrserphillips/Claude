@@ -7,7 +7,6 @@
 'use strict';
 
 const ART_BASE = 'images/minigames/';
-const ART_VERSION = window.VJ_LOAD_T || Date.now(); // fresh every session so changed artwork always shows
 
 const ART_FILES = {
     // shared
@@ -86,7 +85,7 @@ const Art = (() => {
         const entry = { img: new Image(), ok: false, failed: false };
         entry.img.onload = () => { entry.ok = true; };
         entry.img.onerror = () => { entry.failed = true; };
-        entry.img.src = ART_BASE + path + '?v=' + ART_VERSION;
+        entry.img.src = ART_BASE + path;
         cache[path] = entry;
         return entry;
     }
