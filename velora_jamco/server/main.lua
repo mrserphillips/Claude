@@ -53,8 +53,14 @@ do
     ExperimentalRecipe.value = ExperimentalRecipe.value or VJ.rarity('experimental').value
     VJS.Recipes[ExperimentalRecipe.id] = ExperimentalRecipe
     print(('^5[velora_jamco]^7 loaded %d recipes'):format(#VJS.RecipeList))
-    print(('^5[velora_jamco]^7 version %s running from %s'):format(
-        GetResourceMetadata(GetCurrentResourceName(), 'version', 0) or '?', GetResourcePath(GetCurrentResourceName())))
+    local manifestVersion = GetResourceMetadata(GetCurrentResourceName(), 'version', 0) or '?'
+    print(('^5[velora_jamco]^7 version %s running from %s'):format(VJ.VERSION, GetResourcePath(GetCurrentResourceName())))
+    if manifestVersion ~= VJ.VERSION then
+        for _ = 1, 3 do
+            print(('^1[velora_jamco] fxmanifest.lua is STALE (server has v%s, files are v%s). Run "refresh" then "ensure %s" in the console - until then new UI files and artwork are not sent to players.^7')
+                :format(manifestVersion, VJ.VERSION, GetCurrentResourceName()))
+        end
+    end
 end
 
 -- ─────────────────────────────────────────────────────────────────────────
@@ -585,5 +591,5 @@ end)
 
 lib.callback.register('velora_jamco:version', function()
     local res = GetCurrentResourceName()
-    return { version = GetResourceMetadata(res, 'version', 0), path = GetResourcePath(res), name = res }
+    return { version = VJ.VERSION, manifest = GetResourceMetadata(res, 'version', 0), path = GetResourcePath(res), name = res }
 end)

@@ -1,6 +1,9 @@
 -- Shared helpers (client + server)
 VJ = VJ or {}
 
+-- Must match the version in fxmanifest.lua. If they differ, the server is running a stale manifest.
+VJ.VERSION = '1.2.3'
+
 function VJ.clamp(v, lo, hi)
     if v < lo then return lo end
     if v > hi then return hi end

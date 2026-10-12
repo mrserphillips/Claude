@@ -1,7 +1,7 @@
 /* Velora Jam Co. — NUI core: messaging, focus, helpers, overlays */
 'use strict';
 
-const UI_VERSION = '1.2.2';
+const UI_VERSION = '1.2.3';
 const RES = typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'velora_jamco';
 const VJ = { app: null, apps: {}, data: null };
 
@@ -237,7 +237,16 @@ function loadImage(src) {
 // tell Lua which UI build actually loaded (shown by /jamversion); scripts may be injected after 'load'
 function reportReady() {
     document.body.dataset.ready = '1';
-    post('uiVersion', { version: UI_VERSION });
+    // check that the minigame artwork is actually being served by the server
+    const probes = ['images/minigames/harvest/branch.png', 'images/minigames/fruit/apple.png', 'images/minigames/heat/pot.png'];
+    let pending = probes.length;
+    const missing = [];
+    probes.forEach((src) => {
+        const img = new Image();
+        img.onload = () => { if (--pending === 0) post('uiVersion', { version: UI_VERSION, artMissing: missing }); };
+        img.onerror = () => { missing.push(src); if (--pending === 0) post('uiVersion', { version: UI_VERSION, artMissing: missing }); };
+        img.src = src;
+    });
 }
 if (document.readyState === 'complete') setTimeout(reportReady, 0);
 else window.addEventListener('load', reportReady);

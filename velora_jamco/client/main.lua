@@ -276,19 +276,33 @@ end)
 -- ─────────────────────────────────────────────────────────────────────────
 -- /jamversion: shows which server, client script and UI builds are actually running
 -- ─────────────────────────────────────────────────────────────────────────
-local uiVersion = nil
+local uiVersion, uiArtMissing = nil, nil
 RegisterNUICallback('uiVersion', function(data, cb)
     cb(1)
     uiVersion = type(data) == 'table' and data.version or nil
+    uiArtMissing = type(data) == 'table' and data.artMissing or nil
 end)
 
 RegisterCommand('jamversion', function()
-    local clientVersion = GetResourceMetadata(GetCurrentResourceName(), 'version', 0) or '?'
+    local manifest = GetResourceMetadata(GetCurrentResourceName(), 'version', 0) or '?'
     local srv = lib.callback.await('velora_jamco:version', false) or {}
-    local ui = uiVersion or 'NOT REPORTED (old cached UI)'
-    local lines = ('Server: v%s\nClient: v%s\nUI: %s\nFolder: %s'):format(srv.version or '?', clientVersion, uiVersion and ('v' .. ui) or ui, srv.path or '?')
-    print('[velora_jamco] ' .. lines:gsub('\n', ' | '))
-    local ok = uiVersion ~= nil and uiVersion == clientVersion and srv.version == clientVersion
-    lib.notify({ title = 'Velora Jam Co. version', description = lines, type = ok and 'success' or 'error', duration = 12000 })
+    local problems = {}
+    if srv.manifest ~= VJ.VERSION or manifest ~= VJ.VERSION then
+        problems[#problems + 1] = 'Server fxmanifest is stale - run "refresh" then "ensure ' .. GetCurrentResourceName() .. '"'
+    end
+    if not uiVersion then
+        problems[#problems + 1] = 'UI did not report - it is an old cached copy (clear the FiveM cache)'
+    elseif uiVersion ~= VJ.VERSION then
+        problems[#problems + 1] = ('UI is v%s, expected v%s'):format(uiVersion, VJ.VERSION)
+    end
+    if uiArtMissing and #uiArtMissing > 0 then
+        problems[#problems + 1] = 'Minigame art is NOT being served (' .. #uiArtMissing .. ' test images missing) - check fxmanifest files list and run "refresh"'
+    end
+    local lines = ('Scripts: v%s\nServer manifest: v%s\nUI: %s\nArt: %s\nFolder: %s'):format(
+        VJ.VERSION, srv.manifest or '?', uiVersion and ('v' .. uiVersion) or 'not reported',
+        uiArtMissing == nil and 'unknown' or (#uiArtMissing == 0 and 'loaded' or 'MISSING'), srv.path or '?')
+    if #problems > 0 then lines = lines .. '\n\n' .. table.concat(problems, '\n') end
+    print('[velora_jamco] ' .. (lines:gsub('\n', ' | ')))
+    lib.notify({ title = 'Velora Jam Co. version', description = lines, type = #problems == 0 and 'success' or 'error', duration = 15000 })
     SendNUIMessage({ action = 'version' })
 end, false)

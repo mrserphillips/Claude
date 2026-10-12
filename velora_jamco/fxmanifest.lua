@@ -6,7 +6,7 @@ use_experimental_fxv2_oal 'yes'
 name 'velora_jamco'
 author 'Velora RP'
 description 'Velora Jam Co. - fruit harvesting, jam making, recipe discovery and NPC selling'
-version '1.2.2'
+version '1.2.3'
 
 dependencies {
     '/onesync',
