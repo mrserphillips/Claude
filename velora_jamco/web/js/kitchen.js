@@ -45,6 +45,8 @@ VJ.apps.kitchen = (() => {
     }
 
     /* ── Mixing ───────────────────────────────────────────────────────── */
+    const minJars = () => data.rules.minJars || 1;
+    // the biggest batch your fruit allows (never below the minimum batch size)
     function maxJars() {
         if (!mix.fruits.length) return data.rules.maxJars;
         const per = data.rules.fruitPerJar[String(mix.fruits.length)] || 2;
@@ -104,7 +106,7 @@ VJ.apps.kitchen = (() => {
                 </div>
                 <div class="card" style="margin-top:14px">
                     <div class="h3">Kitchen Notes</div>
-                    <div class="small muted">Single fruit: ${data.rules.fruitPerJar['1']} per jar · Two fruits: ${data.rules.fruitPerJar['2']} each · Three fruits: ${data.rules.fruitPerJar['3']} each.<br>Every jar needs sugar, an empty jar and a lid. Special ingredients are used once per batch.</div>
+                    <div class="small muted">Single fruit: ${data.rules.fruitPerJar['1']} per jar · Two fruits: ${data.rules.fruitPerJar['2']} each · Three fruits: ${data.rules.fruitPerJar['3']} each.<br>Every jar needs sugar, an empty jar and a lid. Special ingredients are used once per batch.<br>Each batch makes ${data.rules.minJars || 1}–${data.rules.maxJars} jars; the biggest batch your fruit allows is picked for you.</div>
                 </div>
             </div>
         </div>`;
@@ -310,7 +312,7 @@ VJ.apps.kitchen = (() => {
             if (mix.fruits.includes(id)) mix.fruits = mix.fruits.filter((x) => x !== id);
             else if (mix.fruits.length < 3) { mix.fruits.push(id); SFX.pop(); }
             else return SFX.bad();
-            mix.jars = Math.min(mix.jars, maxJars());
+            mix.jars = clamp(maxJars(), minJars(), data.rules.maxJars);
             return drawMix($('#kView', root));
         }
         const s = t.closest('[data-special]');
@@ -323,7 +325,7 @@ VJ.apps.kitchen = (() => {
         }
         const j = t.closest('[data-jars]');
         if (j) {
-            mix.jars = clamp(mix.jars + Number(j.dataset.jars), 1, data.rules.maxJars);
+            mix.jars = clamp(mix.jars + Number(j.dataset.jars), minJars(), data.rules.maxJars);
             $('#jarCount', root).textContent = mix.jars;
             SFX.click();
             return requestPreview();
@@ -351,7 +353,7 @@ VJ.apps.kitchen = (() => {
     return {
         open(section, d) {
             root = section; data = d; tab = 'mix'; craft = null; busy = false; preview = null;
-            mix = { fruits: [], special: null, jars: 1, pectin: false };
+            mix = { fruits: [], special: null, jars: d.rules.minJars || 1, pectin: false };
             Art.preload();
             Art.preloadFruit(d.fruits.map((f) => f.id));
             shell();

@@ -88,7 +88,15 @@ In **real GTA tree** mode, look at the base of a real orange tree and press E. N
 | Market saturation | −2.5% per jar sold of that recipe, floor 65%, recovers 1% per minute |
 | Supplies per jar (sugar, jar, lid) | about $17 |
 
-**Typical earnings:** a 4-jar Uncommon batch at Fine quality sells for roughly $520–600. That batch takes about 16 fruit (5–6 trees) and roughly 10–15 minutes of total work. To scale payouts, change `Config.Rarities[*].value`.
+**Batches:** every batch makes 3–12 jars (`Config.Crafting.MinJarsPerBatch` / `MaxJarsPerBatch`), and the kitchen picks the biggest batch your fruit allows.
+
+| Fruits in the mix | Fruit per jar (`FruitPerJar`) | Example |
+|---|---|---|
+| One | 2 | 12 strawberries make 6 jars |
+| Two | 1 of each | 8 strawberries + 8 raspberries make 8 jars |
+| Three | 1 of each | 5 of each of three berries make 5 jars |
+
+**Typical earnings:** an 8-jar Uncommon batch at Fine quality sells for roughly $1,000–1,200. That batch takes 16 fruit (about 4–5 trees) and roughly 10–15 minutes of work. Bigger batches add only a couple of extra slicing targets and stir turns. If that pays too much for your server, lower `Config.Rarities[*].value` or raise `FruitPerJar`.
 
 Fruit can't be bought, jam can only be sold to NPCs (with cooldowns), and supplies can't be sold back, so there is no money loop.
 

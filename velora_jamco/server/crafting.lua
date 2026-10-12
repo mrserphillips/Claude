@@ -39,7 +39,10 @@ local function parseIngredients(data)
     end
 
     local jars = math.floor(tonumber(data.jars) or 1)
-    if jars < 1 or jars > Config.Crafting.MaxJarsPerBatch then return nil, 'Invalid batch size.' end
+    local minJars = Config.Crafting.MinJarsPerBatch or 1
+    if jars < minJars or jars > Config.Crafting.MaxJarsPerBatch then
+        return nil, ('A batch makes between %d and %d jars.'):format(minJars, Config.Crafting.MaxJarsPerBatch)
+    end
 
     return { fruits = fruits, special = special, jars = jars, pectin = data.pectin == true }
 end
@@ -110,6 +113,7 @@ lib.callback.register('velora_jamco:kitchen:getData', function(src)
         supplies = Config.Supplies,
         rules = {
             maxJars = Config.Crafting.MaxJarsPerBatch,
+            minJars = Config.Crafting.MinJarsPerBatch or 1,
             -- string keys so the table serialises as a JSON object, not an array
             fruitPerJar = {
                 ['1'] = Config.Crafting.FruitPerJar[1],
@@ -396,13 +400,13 @@ lib.callback.register('velora_jamco:craft:start', function(src, data)
     local bandMin = mg.heat.bandMin + math.random(-2, 2)
 
     local params = {
-        prepare = { targets = mg.prepare.targets + parsed.jars - 1, window = mg.prepare.window / d },
+        prepare = { targets = mg.prepare.targets + math.floor((parsed.jars - 1) / 3), window = mg.prepare.window / d },
         heat = {
             startTemp = mg.heat.startTemp, bandMin = bandMin, bandMax = bandMin + mg.heat.bandWidth / d,
             cookSeconds = mg.heat.cookSeconds * math.sqrt(d), burnSeconds = mg.heat.burnSeconds,
         },
         stir = {
-            revolutions = mg.stir.revolutions + parsed.jars - 1,
+            revolutions = mg.stir.revolutions + math.floor((parsed.jars - 1) / 3),
             burnRate = mg.stir.burnRate * d * (parsed.pectin and 0.8 or 1.0),
         },
         fill = {

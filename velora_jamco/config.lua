@@ -303,9 +303,11 @@ Config.Kitchens = {
 -- Crafting
 -- ─────────────────────────────────────────────────────────────────────────
 Config.Crafting = {
-    MaxJarsPerBatch = 4,
+    -- every batch makes several jars; the kitchen picks the most you can afford automatically
+    MinJarsPerBatch = 3,
+    MaxJarsPerBatch = 12,
     -- fruit pieces needed PER JAR for EACH fruit in the mix, by number of different fruits
-    FruitPerJar = { [1] = 4, [2] = 2, [3] = 2 },
+    FruitPerJar = { [1] = 2, [2] = 1, [3] = 1 },
     SugarPerJar = 1,
     -- special ingredient (cinnamon, honey, golden fruit...) is used once per batch
     SpecialPerBatch = 1,
