@@ -98,18 +98,11 @@ lib.callback.register('velora_jamco:business:getData', function(src)
     local stats = VJS.getStats(cid)
 
     local orchards = {}
-    for _, orchard in ipairs(Config.Orchards) do
-        local fruits, seen = {}, {}
-        for _, t in ipairs(orchard.trees) do
-            if not seen[t.fruit] then
-                seen[t.fruit] = true
-                fruits[#fruits + 1] = { id = t.fruit, label = Config.Fruits[t.fruit].label, item = Config.Fruits[t.fruit].item }
-            end
-        end
+    for _, o in ipairs(VJS.orchardSummary()) do
         orchards[#orchards + 1] = {
-            id = orchard.id, label = orchard.label, description = orchard.description,
-            x = orchard.center.x, y = orchard.center.y, trees = #orchard.trees, fruits = fruits,
-            distance = math.floor(VJS.distance(src, orchard.center)),
+            id = o.orchard.id, label = o.orchard.label, description = o.orchard.description,
+            x = o.x, y = o.y, trees = o.trees, fruits = o.fruits,
+            distance = math.floor(VJS.distance(src, vec3(o.x, o.y, VJS.coords(src) and VJS.coords(src).z or 0.0))),
         }
     end
 

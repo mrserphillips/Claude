@@ -7,6 +7,7 @@
 'use strict';
 
 const ART_BASE = 'images/minigames/';
+const ART_VERSION = '1.2.0'; // bump to force FiveM to reload changed artwork
 
 const ART_FILES = {
     // shared
@@ -85,7 +86,7 @@ const Art = (() => {
         const entry = { img: new Image(), ok: false, failed: false };
         entry.img.onload = () => { entry.ok = true; };
         entry.img.onerror = () => { entry.failed = true; };
-        entry.img.src = ART_BASE + path;
+        entry.img.src = ART_BASE + path + '?v=' + ART_VERSION;
         cache[path] = entry;
         return entry;
     }

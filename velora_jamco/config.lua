@@ -193,6 +193,15 @@ Config.Harvest = {
     RottenPenalty    = 1,     -- fruit lost per rotten fruit clicked
     FallbackProp     = 'prop_bush_med_03',
 
+    -- Trees placed in-game with /jamplace are saved in the database (recommended).
+    -- Set to true to ALSO spawn the example trees listed in Config.Orchards below.
+    UseConfigTrees = false,
+    DefaultProps = { tree = 'prop_veg_crop_orange', bush = 'prop_bush_med_03' },
+    BushFruits = { strawberry = true, blueberry = true, blackberry = true, raspberry = true },
+    FruitDifficulty = { orange = 'easy', strawberry = 'easy', cherry = 'hard', blackberry = 'hard' },
+    -- stock / restock / yield for trees placed in-game
+    Placed = { stock = 12, restock = 900, yield = { min = 3, max = 5 }, bushYield = { min = 4, max = 6 } },
+
     -- Animations by tree "anim" type
     Anims = {
         tree = { dict = 'amb@prop_human_movie_bulb@base', clip = 'base' },

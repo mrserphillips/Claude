@@ -16,25 +16,42 @@ These are restricted to `Config.AdminGroup` (default `group.admin`).
 - **`returnPoint` and `returnRadius`:** where a van must be parked for its deposit to be refunded.
 - **`Config.Van.Spawns`:** the van bays, tried in order. Occupied bays are skipped.
 
-## 2. Orchard trees: `Config.Orchards[*].trees`
-Each line looks like this:
-```lua
-tree('gs_orange_1', 'orange', x, y, z, { difficulty = 'easy', stock = 12, restock = 900, yield = { min = 3, max = 5 } })
-bush('gs_rasp_1', 'raspberry', x, y, z)
-```
-- **`prop`:** a model to spawn locally. Props snap to the ground, so Z only needs to be roughly right.
-- **`prop = false`:** targets a real GTA tree already standing at those coordinates. Stand next to the trunk and use `/jamtree orange`, then add `prop = false` to the options.
-- **Orange trees:** only produce oranges unless you change `fruit`. To have several fruits in one spot, add one entry per fruit.
-- **Other options:**
+## 2. Orchard trees
+**Use the in-game placement tool.** You don't need to edit coordinates. Placed trees are saved in the database (`velora_jamco_trees`) and appear for everyone straight away.
 
-  | Option | What it controls |
-  |---|---|
-  | `stock` | Total fruit before the tree is picked clean |
-  | `restock` | Seconds until a picked-clean tree refills |
-  | `yield` | Ripe fruit per picking round |
-  | `difficulty` | `easy`, `normal` or `hard` (presets in `Config.Harvest.Difficulties`) |
+| Command | What it does |
+|---|---|
+| `/jamplace [fruit]` | Starts placement mode. The fruit defaults to `orange`. |
+| `/jamremove` | Removes the placed tree nearest to you (within 4 m) |
+| `/jamreset` | Restocks every tree immediately |
 
-- **Tree ids:** must be unique.
+**Placement mode controls:**
+
+| Key | Action |
+|---|---|
+| Look at the ground | Shows a see-through preview of the tree where it will stand |
+| **E** | Place a tree |
+| **Mouse wheel** | Rotate |
+| **← / →** | Change fruit |
+| **G** | Switch between a spawned prop and a real GTA tree |
+| **Backspace** | Finish |
+
+In **real GTA tree** mode, look at the base of a real orange tree and press E. Nothing is spawned; the real tree just becomes harvestable. This is what you want for the Grapeseed orange groves.
+
+**What placed trees use:**
+- **Props:** strawberries, blueberries, blackberries and raspberries are bushes (`prop_bush_med_03`). Everything else is a fruit tree (`prop_veg_crop_orange`). Both are set in `Config.Harvest.DefaultProps`.
+- **Stock, restock and yield:** set in `Config.Harvest.Placed`.
+- **Difficulty per fruit:** set in `Config.Harvest.FruitDifficulty`.
+- **Orchard blip and waypoint:** follow wherever the trees are.
+
+**Example trees in `Config.Orchards[*].trees`:**
+- These use placeholder coordinates and are **off by default** (`Config.Harvest.UseConfigTrees = false`).
+- To use them, set that to `true` and fix each line, for example:
+  ```lua
+  tree('gs_orange_1', 'orange', x, y, z, { difficulty = 'easy' })
+  ```
+- `prop = false` targets a real tree at the coordinates.
+- `/jamtree <fruit>` copies a ready-made line for where you stand.
 
 ## 3. Kitchen: `Config.Kitchens`
 - **`coords`:** the interaction point. Put it on the hob of the stove.

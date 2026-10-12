@@ -20,7 +20,17 @@
   - On a restart, deposits are refunded to online players when the resource stops.
   - If a player crashed, their refund is queued and paid automatically the next time they log in.
 
+## The UI looks old after an update
+FiveM caches UI files on each player's PC. Every UI file is versioned, so an update normally shows straight away. If you still see the old UI:
+1. **Restart the resource properly.** Run `refresh`, then `ensure velora_jamco` in the server console. `refresh` is needed whenever `fxmanifest.lua` changes, and this update adds new image folders.
+2. **Clear the FiveM cache:** close FiveM, open `%localappdata%\FiveM\FiveM.app\data\`, delete the `cache`, `server-cache`, `server-cache-priv` and `nui-storage` folders, then reconnect.
+3. **Check the files:** make sure the server has the new files, including `web/js/art.js` and the `web/images/minigames/` folder.
+
 ## Harvesting
+- **Trees float or stand in concrete:**
+  - The example trees use placeholder coordinates and are now off by default.
+  - Remove any old trees you placed by editing `config.lua`, then place trees in-game with `/jamplace`.
+  - Placed props wait for the ground to load before snapping down.
 - **Can't target a tree:**
   - If `prop = false`, the coordinates must be on the real tree.
   - Set `Config.Debug = true` to draw the target zones.
